@@ -10,7 +10,9 @@ and save prompts they want to revisit.
 - Tailored prompts for two people, friends, or groups.
 - Quick, full, and long sessions.
 - Cooperative live rooms where one host controls the shared deck.
-- `Points Mode` live rooms for 3-6 phones with turns, targeting, scoring, Bailout, and Double Down.
+- `Date Night` live rooms for two phones with a shared connection milestone and optional closing reward.
+- `Inner Circle` live rooms for 3-6 phones with fair targeting, scoring, Bailout, and Double Down.
+- `Icebreaker` live rooms for 3-6 phones with roulette turns and shared group progress.
 - Session resume and a locally saved card collection.
 - Installable, responsive PWA with offline support.
 - Original branding and original card copy.
@@ -25,18 +27,15 @@ Open `http://localhost:4173` on a desktop. To join a live room from phones on th
 Wi-Fi network, open the development machine's network address with port `4173`, then enter
 the room code or open the invite link copied by the host.
 
-## Points Mode
+## Adaptive Live Experiences
 
-When creating a live room, select `Points Mode`. Once 3-6 players have joined, the host
-starts the match. On each turn the active player privately draws a `Curiosity` (1 point),
-`Connection` (3 points), or `Reflection` (5 points) card and targets another player.
+When creating a live room, choose the experience that suits the table:
 
-- Responders tap `Completed` to earn points or `Pass` to let the active player claim or discard.
-- Each player has one free `Bailout`, which removes a prompt and redirects a same-level replacement.
-- Each player has one `Double Down`, which doubles a responder's reward while risking the base value.
-- The first player to 21 points wins; if all 36 prompts run out first, the high score wins.
+- `Date Night` has two partners build a shared meter toward 20 points while completing two prompts at each depth. Reaching the milestone unlocks a shared activity or meaningful closing question.
+- `Inner Circle` keeps private draws, selected responders, one free `Bailout`, and one `Double Down`, while cooldowns spread prompts fairly around the group. First to 21 wins.
+- `Icebreaker` has the active facilitator pick a light depth, then spin for a fair server-selected responder. The group builds toward 15 points together.
 
-Points Mode rooms live only in server memory during this prototype release, so restarting
+Adaptive rooms live only in server memory during this prototype release, so restarting
 the local server clears active matches.
 
 ## Test

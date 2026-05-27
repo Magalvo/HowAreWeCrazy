@@ -1,12 +1,15 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { advance, continueLevel, createSession, reveal } from "../game-engine.js";
 import {
-  addLobbyPlayer,
-  competitiveView,
-  createCompetitiveMatch,
-  performCompetitiveAction,
-  setCompetitivePresence
-} from "../competitive-engine.js";
+  adaptiveView,
+  addAdaptiveLobbyPlayer,
+  canHostSkipAdaptive,
+  createAdaptiveMatch,
+  isAdaptiveMode,
+  normalizeAdaptiveMode,
+  performAdaptiveAction,
+  setAdaptivePresence
+} from "../adaptive-engine.js";
 
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -57,31 +60,16 @@ export function createRoomStore({
     return member;
   }
 
-  function stalledForHost(room, viewerId) {
-    if (room.mode !== "competitive") {
-      return false;
-    }
-    const viewer = room.session.players.find((item) => item.id === viewerId);
-    if (viewer?.role !== "host" || room.session.status !== "playing") {
-      return false;
-    }
-    const active = room.session.players.find((item) => item.id === room.session.activePlayerId);
-    const target = room.session.players.find((item) => item.id === room.session.targetPlayerId);
-    const noEligibleTarget = ["preview_card", "replacement_preview"].includes(room.session.phase) &&
-      !room.session.players.some((item) =>
-        item.connected &&
-        item.id !== room.session.activePlayerId &&
-        item.id !== room.session.currentChallenge?.excludedTargetId
-      );
-    return active?.connected === false ||
-      (room.session.phase === "await_response" && target?.connected === false) ||
-      noEligibleTarget;
+  function adaptiveRoom(room) {
+    return isAdaptiveMode(room.mode);
   }
 
   function publicRoom(room, participantToken) {
-    if (room.mode === "competitive") {
+    if (adaptiveRoom(room)) {
       const member = memberByToken(room, participantToken);
-      const view = competitiveView(room.session, member.id, { canSkip: stalledForHost(room, member.id) });
+      const view = adaptiveView(room.session, member.id, {
+        canSkip: canHostSkipAdaptive(room.session, member.id)
+      });
       return {
         code: room.code,
         mode: room.mode,
@@ -102,7 +90,7 @@ export function createRoomStore({
   }
 
   function broadcast(room) {
-    if (room.mode === "competitive") {
+    if (adaptiveRoom(room)) {
       room.listeners.forEach((entry) => entry.listener(publicRoom(room, entry.participantToken)));
       return;
     }
@@ -111,12 +99,14 @@ export function createRoomStore({
   }
 
   function createRoom({ audience, playerNames = "", cardsPerLevel = 6, hostName = "", mode = "conversation" }) {
-    if (!["conversation", "competitive"].includes(mode)) {
+    const normalizedMode = normalizeAdaptiveMode(mode);
+    if (normalizedMode !== "conversation" && !isAdaptiveMode(normalizedMode)) {
       const error = new Error("Invalid room mode");
       error.statusCode = 400;
       throw error;
     }
-    if (!["couple", "friends", "group"].includes(audience) || ![4, 6, 8].includes(Number(cardsPerLevel))) {
+    if (normalizedMode === "conversation" &&
+      (!["couple", "friends", "group"].includes(audience) || ![4, 6, 8].includes(Number(cardsPerLevel)))) {
       const error = new Error("Invalid game settings");
       error.statusCode = 400;
       throw error;
@@ -133,14 +123,14 @@ export function createRoomStore({
       role: "host"
     };
 
-    if (mode === "competitive") {
+    if (isAdaptiveMode(normalizedMode)) {
       const participantToken = createToken();
       const room = {
         code,
-        mode,
+        mode: normalizedMode,
         hostToken,
         members: [{ id: host.id, participantToken }],
-        session: createCompetitiveMatch({ participants: [host], audience, random }),
+        session: createAdaptiveMatch({ mode: normalizedMode, participants: [host], random }),
         createdAt: now(),
         listeners: new Set(),
         disconnectTimers: new Map(),
@@ -157,7 +147,7 @@ export function createRoomStore({
 
     const room = {
       code,
-      mode,
+      mode: normalizedMode,
       hostToken,
       participants: [host],
       session: createSession({ audience, playerNames, cardsPerLevel: Number(cardsPerLevel), random }),
@@ -170,9 +160,9 @@ export function createRoomStore({
 
   function joinRoom(code, name) {
     const room = requireRoom(code);
-    if (room.mode === "competitive") {
+    if (adaptiveRoom(room)) {
       if (room.session.status !== "lobby") {
-        const error = new Error("This Points Mode match has already started");
+        const error = new Error("This experience has already started");
         error.statusCode = 409;
         throw error;
       }
@@ -183,7 +173,7 @@ export function createRoomStore({
         role: "player"
       };
       room.members.push({ id: participant.id, participantToken });
-      room.session = addLobbyPlayer(room.session, participant);
+      room.session = addAdaptiveLobbyPlayer(room.session, participant);
       broadcast(room);
       return {
         room: publicRoom(room, participantToken),
@@ -210,12 +200,12 @@ export function createRoomStore({
   function act(code, credential, action, payload = {}) {
     const room = requireRoom(code);
 
-    if (room.mode === "competitive") {
+    if (adaptiveRoom(room)) {
       const member = memberByToken(room, credential);
-      room.session = performCompetitiveAction(room.session, member.id, action, {
+      room.session = performAdaptiveAction(room.session, member.id, action, {
         ...payload,
-        canSkip: action === "skip_stalled_turn" && stalledForHost(room, member.id)
-      });
+        canSkip: action === "skip_stalled_turn" && canHostSkipAdaptive(room.session, member.id)
+      }, random);
       broadcast(room);
       return publicRoom(room, credential);
     }
@@ -247,7 +237,7 @@ export function createRoomStore({
     const count = (room.connectionCounts.get(member.id) || 0) + 1;
     room.connectionCounts.set(member.id, count);
     if (room.session.players.find((item) => item.id === member.id)?.connected === false) {
-      room.session = setCompetitivePresence(room.session, member.id, true);
+      room.session = setAdaptivePresence(room.session, member.id, true);
       broadcast(room);
     }
   }
@@ -260,7 +250,7 @@ export function createRoomStore({
     }
     const timer = setTimeout(() => {
       if ((room.connectionCounts.get(member.id) || 0) === 0) {
-        room.session = setCompetitivePresence(room.session, member.id, false);
+        room.session = setAdaptivePresence(room.session, member.id, false);
         broadcast(room);
       }
       room.disconnectTimers.delete(member.id);
@@ -271,7 +261,7 @@ export function createRoomStore({
 
   function subscribe(code, participantToken, listener) {
     const room = requireRoom(code);
-    if (room.mode === "competitive") {
+    if (adaptiveRoom(room)) {
       const member = memberByToken(room, participantToken);
       const entry = { participantToken, listener };
       room.listeners.add(entry);

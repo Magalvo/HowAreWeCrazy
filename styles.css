@@ -469,6 +469,56 @@ small {
   margin: 0 0 4px;
 }
 
+.shared-meter {
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 15px;
+}
+
+.meter-copy {
+  align-items: baseline;
+  color: var(--muted);
+  display: flex;
+  font-size: 0.88rem;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.meter-copy strong {
+  color: var(--accent-dark);
+  font-size: 1.15rem;
+}
+
+.meter-track {
+  background: var(--accent-soft);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.meter-track span {
+  background: var(--accent);
+  display: block;
+  height: 100%;
+  transition: width 250ms ease;
+}
+
+.level-progress {
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.76rem;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.level-progress span {
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 6px 9px;
+}
+
 .scoreboard {
   display: grid;
   gap: 8px;
@@ -612,6 +662,43 @@ small {
   color: var(--accent-dark);
   font-weight: 650;
   padding: 10px 15px;
+}
+
+.target-button.is-cooling {
+  background: #e5ded6;
+  color: var(--muted);
+}
+
+.ending-picker,
+.reward-card {
+  background: var(--surface-strong);
+  border: 1px solid var(--accent-soft);
+  border-radius: 22px;
+  padding: 19px;
+}
+
+.ending-picker h3 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.45rem;
+  font-weight: 500;
+  line-height: 1.25;
+  margin: 0 0 17px;
+}
+
+.ending-actions {
+  display: grid;
+  gap: 9px;
+}
+
+.reward-card {
+  margin-bottom: 20px;
+}
+
+.reward-card > p:not(.eyebrow) {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.35rem;
+  line-height: 1.4;
+  margin: 0;
 }
 
 .points-actions {

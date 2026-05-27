@@ -61,7 +61,7 @@
         </fieldset>
 
         <form class="setup-form" id="setup-form">
-          <fieldset>
+          <fieldset id="audience-field">
             <legend>Who is playing?</legend>
             <div class="choice-grid">
               <label class="choice">
@@ -101,9 +101,19 @@
                 <span class="choice-copy">One shared deck, no score</span>
               </label>
               <label class="rule-choice">
-                <input type="radio" name="roomMode" value="competitive" />
-                <span class="choice-title">Points Mode</span>
-                <span class="choice-copy">3-6 phones, target and score</span>
+                <input type="radio" name="roomMode" value="date_night" />
+                <span class="choice-title">Date Night</span>
+                <span class="choice-copy">2 phones, build connection together</span>
+              </label>
+              <label class="rule-choice">
+                <input type="radio" name="roomMode" value="inner_circle" />
+                <span class="choice-title">Inner Circle</span>
+                <span class="choice-copy">3-6 friends, points with fair turns</span>
+              </label>
+              <label class="rule-choice">
+                <input type="radio" name="roomMode" value="icebreaker" />
+                <span class="choice-title">Icebreaker</span>
+                <span class="choice-copy">3-6 players, group roulette</span>
               </label>
             </div>
           </fieldset>
@@ -149,7 +159,7 @@
         <aside class="room-banner">
           <div class="room-heading">
             <div>
-              <p class="eyebrow">Points Mode</p>
+              <p class="eyebrow" id="points-room-label">Live experience</p>
               <p class="room-code" id="points-room-code"></p>
             </div>
             <button class="ghost-button" id="points-copy-invite-button">Copy invite</button>
@@ -170,7 +180,15 @@
               <p class="eyebrow" id="points-turn-label"></p>
               <h2 id="points-turn-name"></h2>
             </div>
-            <p class="score-target">First to <strong>21</strong></p>
+            <p class="score-target" id="points-goal-copy"></p>
+          </div>
+          <div class="shared-meter" id="points-shared-meter" hidden>
+            <div class="meter-copy">
+              <span id="points-meter-label"></span>
+              <strong id="points-meter-value"></strong>
+            </div>
+            <div class="meter-track" aria-hidden="true"><span id="points-meter-bar"></span></div>
+            <div class="level-progress" id="points-level-progress"></div>
           </div>
           <div class="scoreboard" id="points-scoreboard"></div>
           <p class="points-guidance" id="points-guidance"></p>
@@ -193,7 +211,17 @@
             </div>
           </article>
 
+          <div class="ending-picker" id="points-ending-picker" hidden>
+            <p class="eyebrow">Shared milestone reached</p>
+            <h3>How would you like to close tonight?</h3>
+            <div class="ending-actions">
+              <button class="primary-button" id="points-activity-button">Do Something Together</button>
+              <button class="secondary-button" id="points-question-button">One More Meaningful Question</button>
+            </div>
+          </div>
+
           <div class="points-actions" id="points-actions">
+            <button class="primary-button" id="points-spin-button" hidden>Spin for responder</button>
             <button class="primary-button" id="points-complete-button" hidden>Completed</button>
             <button class="secondary-button" id="points-pass-button" hidden>Pass</button>
             <button class="text-button bailout-button" id="points-bailout-button" hidden>Bailout</button>
@@ -205,9 +233,13 @@
         </div>
 
         <div class="points-results" id="points-results" hidden>
-          <p class="eyebrow">Match complete</p>
+          <p class="eyebrow" id="points-result-eyebrow">Experience complete</p>
           <h2 id="points-result-title"></h2>
           <p class="lede" id="points-result-copy"></p>
+          <article class="reward-card" id="points-reward-card" hidden>
+            <p class="eyebrow" id="points-reward-label"></p>
+            <p id="points-reward-copy"></p>
+          </article>
           <div class="scoreboard final-scoreboard" id="points-final-scoreboard"></div>
           <button class="primary-button" id="points-leave-button">Leave room</button>
         </div>

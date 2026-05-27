@@ -1,12 +1,13 @@
-const CACHE_NAME = "open-thread-v7";
+const CACHE_NAME = "open-thread-v8";
 const CORE_ASSETS = [
   "/",
   "/index.html",
   "/styles.css",
   "/app.js",
   "/game-engine.js",
-  "/competitive-engine.js",
+  "/adaptive-engine.js",
   "/data/prompts.js",
+  "/data/date-rewards.js",
   "/manifest.webmanifest",
   "/assets/icon.svg"
 ];

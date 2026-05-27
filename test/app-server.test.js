@@ -63,14 +63,12 @@ test("room API rejects deck controls without the host token", async (t) => {
   assert.match((await response.json()).error, /Only the host/);
 });
 
-test("Points Mode API authenticates player actions and hides private preview prompts", async (t) => {
+test("Inner Circle API authenticates player actions and hides private preview prompts", async (t) => {
   const { server, origin } = await openTestServer();
   t.after(() => server.close());
 
   const created = await (await postJson(origin, "/api/rooms", {
-    audience: "group",
-    cardsPerLevel: 4,
-    mode: "competitive"
+    mode: "inner_circle"
   })).json();
   const joinedOne = await (await postJson(origin, "/api/rooms/ROOM7/join", { name: "Lee" })).json();
   await postJson(origin, "/api/rooms/ROOM7/join", { name: "Ren" });
@@ -88,16 +86,15 @@ test("Points Mode API authenticates player actions and hides private preview pro
   const guest = await (await fetch(`${origin}/api/rooms/ROOM7?participantToken=${joinedOne.participantToken}`)).json();
   assert.ok(host.session.currentChallenge.prompt.text);
   assert.equal(guest.session.currentChallenge.prompt, undefined);
+  assert.equal(guest.session.currentChallenge.promptId, undefined);
 });
 
-test("Points Mode event stream sends a personalized private-preview snapshot", async (t) => {
+test("Inner Circle event stream sends a personalized private-preview snapshot", async (t) => {
   const { server, origin } = await openTestServer();
   t.after(() => server.close());
 
   const created = await (await postJson(origin, "/api/rooms", {
-    audience: "group",
-    cardsPerLevel: 4,
-    mode: "competitive"
+    mode: "inner_circle"
   })).json();
   const guest = await (await postJson(origin, "/api/rooms/ROOM7/join", { name: "Lee" })).json();
   await postJson(origin, "/api/rooms/ROOM7/join", { name: "Ren" });
@@ -123,4 +120,59 @@ test("Points Mode event stream sends a personalized private-preview snapshot", a
   assert.match(eventBody, /event: room/);
   assert.match(eventBody, /"phase":"preview_card"/);
   assert.doesNotMatch(eventBody, /"prompt":/);
+  assert.doesNotMatch(eventBody, /"promptId":/);
+});
+
+test("Icebreaker event snapshots conceal the prompt until spinning", async (t) => {
+  const { server, origin } = await openTestServer();
+  t.after(() => server.close());
+
+  const created = await (await postJson(origin, "/api/rooms", { mode: "icebreaker" })).json();
+  const guest = await (await postJson(origin, "/api/rooms/ROOM7/join", { name: "Lee" })).json();
+  await postJson(origin, "/api/rooms/ROOM7/join", { name: "Ren" });
+  await postJson(origin, "/api/rooms/ROOM7/actions", {
+    action: "start_match",
+    participantToken: created.participantToken
+  });
+  await postJson(origin, "/api/rooms/ROOM7/actions", {
+    action: "choose_level",
+    levelId: "connection",
+    participantToken: created.participantToken
+  });
+  const concealed = await (await fetch(
+    `${origin}/api/rooms/ROOM7?participantToken=${guest.participantToken}`
+  )).json();
+  assert.equal(concealed.session.phase, "spin_target");
+  assert.equal(concealed.session.currentChallenge.prompt, undefined);
+  assert.equal(concealed.session.currentChallenge.promptId, undefined);
+
+  await postJson(origin, "/api/rooms/ROOM7/actions", {
+    action: "spin_target",
+    participantToken: created.participantToken
+  });
+  const revealed = await (await fetch(
+    `${origin}/api/rooms/ROOM7?participantToken=${guest.participantToken}`
+  )).json();
+  assert.ok(revealed.session.currentChallenge.prompt.text);
+});
+
+test("Date Night publishes prompts to both partners immediately after level selection", async (t) => {
+  const { server, origin } = await openTestServer();
+  t.after(() => server.close());
+
+  const created = await (await postJson(origin, "/api/rooms", { mode: "date_night" })).json();
+  const partner = await (await postJson(origin, "/api/rooms/ROOM7/join", { name: "Lee" })).json();
+  await postJson(origin, "/api/rooms/ROOM7/actions", {
+    action: "start_match",
+    participantToken: created.participantToken
+  });
+  await postJson(origin, "/api/rooms/ROOM7/actions", {
+    action: "choose_level",
+    levelId: "curiosity",
+    participantToken: created.participantToken
+  });
+  const view = await (await fetch(
+    `${origin}/api/rooms/ROOM7?participantToken=${partner.participantToken}`
+  )).json();
+  assert.ok(view.session.currentChallenge.prompt.text);
 });
