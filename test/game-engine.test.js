@@ -31,6 +31,21 @@ test("requires a reveal state without losing progress", () => {
   assert.equal(currentPosition(revealed), 1);
 });
 
+test("general couple conversations do not include A Table 4 Two-only expansion cards", () => {
+  const session = createSession({ audience: "couple", cardsPerLevel: 20, random: fixedRandom });
+
+  assert.equal(Object.values(session.cardsByLevel).flat().some((id) => id.startsWith("d")), false);
+});
+
+test("local conversations exclude spicy prompts by default", () => {
+  const session = createSession({ audience: "friends", cardsPerLevel: 50, random: fixedRandom });
+  const ids = Object.values(session.cardsByLevel).flat();
+
+  assert.equal(ids.includes("q131"), false);
+  assert.equal(ids.includes("q132"), false);
+  assert.equal(ids.includes("q134"), false);
+});
+
 test("pauses between levels and finishes after the final prompt", () => {
   let session = createSession({ audience: "group", cardsPerLevel: 4, random: fixedRandom });
 

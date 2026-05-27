@@ -98,7 +98,14 @@ export function createRoomStore({
     room.listeners.forEach((listener) => listener(snapshot));
   }
 
-  function createRoom({ audience, playerNames = "", cardsPerLevel = 6, hostName = "", mode = "conversation" }) {
+  function createRoom({
+    audience,
+    playerNames = "",
+    cardsPerLevel = 6,
+    hostName = "",
+    mode = "conversation",
+    promptFilters
+  }) {
     const normalizedMode = normalizeAdaptiveMode(mode);
     if (normalizedMode !== "conversation" && !isAdaptiveMode(normalizedMode)) {
       const error = new Error("Invalid room mode");
@@ -130,7 +137,7 @@ export function createRoomStore({
         mode: normalizedMode,
         hostToken,
         members: [{ id: host.id, participantToken }],
-        session: createAdaptiveMatch({ mode: normalizedMode, participants: [host], random }),
+        session: createAdaptiveMatch({ mode: normalizedMode, participants: [host], random, promptFilters }),
         createdAt: now(),
         listeners: new Set(),
         disconnectTimers: new Map(),

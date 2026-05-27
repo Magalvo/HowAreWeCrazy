@@ -8,7 +8,15 @@ export interface Prompt {
   id: string;
   level: string;
   audiences: Audience[];
+  experiences?: AdaptiveMode[];
+  isSpicy?: boolean;
+  tags?: string[];
   text: string;
+}
+
+export interface PromptFilters {
+  tags: string[];
+  includeSpicy: boolean;
 }
 
 export interface Level {
@@ -63,13 +71,14 @@ export interface AdaptiveSession {
   remainingByLevel: Record<string, number>;
   currentChallenge?: Challenge | null;
   targetablePlayerIds?: string[];
+  promptFilters?: PromptFilters;
   connectionScore?: number;
   groupScore?: number;
   completedByLevel?: Record<string, number>;
   winnerIds?: string[];
   endReason?: string;
   endingChoice?: "activity" | "question";
-  revealedReward?: { text: string };
+  revealedReward?: { id: string; text: string };
 }
 
 export interface Participant {

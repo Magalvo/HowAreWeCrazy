@@ -99,7 +99,7 @@ test("Inner Circle exposes host skip after a disconnected current responder", as
   assert.ok(hostView.session.availableActions.includes("skip_stalled_turn"));
 });
 
-test("Date Night accepts exactly a pair and broadcasts its revealed prompt", () => {
+test("A Table 4 Two accepts exactly a pair and broadcasts its revealed prompt", () => {
   const store = createFixedStore();
   const created = store.createRoom({ mode: "date_night", hostName: "Ari" });
   const partner = store.joinRoom("PLAY5", "Lee");
@@ -107,6 +107,37 @@ test("Date Night accepts exactly a pair and broadcasts its revealed prompt", () 
   store.act("PLAY5", created.participantToken, "start_match");
   store.act("PLAY5", created.participantToken, "choose_level", { levelId: "curiosity" });
   assert.ok(store.getRoom("PLAY5", partner.participantToken).session.currentChallenge.prompt.text);
+});
+
+test("A Table 4 Two room creation accepts and exposes safe custom theme filters", () => {
+  const store = createFixedStore();
+  const created = store.createRoom({
+    mode: "date_night",
+    hostName: "Ari",
+    promptFilters: { tags: ["Future", "Romance"], includeSpicy: true }
+  });
+
+  assert.deepEqual(created.room.session.promptFilters, { tags: ["Future", "Romance"], includeSpicy: true });
+  assert.equal(created.room.session.usedPromptIds, undefined);
+});
+
+test("room creation rejects invalid custom filters", () => {
+  const store = createFixedStore();
+
+  assert.throws(
+    () => store.createRoom({
+      mode: "date_night",
+      promptFilters: { tags: ["Childhood"], includeSpicy: false }
+    }),
+    /at least 2 prompts/
+  );
+  assert.throws(
+    () => store.createRoom({
+      mode: "icebreaker",
+      promptFilters: { tags: ["Identity"], includeSpicy: false }
+    }),
+    /only available for A Table 4 Two/
+  );
 });
 
 test("Icebreaker conceals a chosen prompt until a server-selected spin target exists", () => {

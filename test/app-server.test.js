@@ -166,7 +166,7 @@ test("Icebreaker event snapshots conceal the prompt until spinning", async (t) =
   assert.ok(revealed.session.currentChallenge.prompt.text);
 });
 
-test("Date Night publishes prompts to both partners immediately after level selection", async (t) => {
+test("A Table 4 Two publishes prompts to both partners immediately after level selection", async (t) => {
   const { server, origin } = await openTestServer();
   t.after(() => server.close());
 

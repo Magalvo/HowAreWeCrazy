@@ -44,10 +44,35 @@ function levelIdsForMode(mode) {
   return mode === "icebreaker" ? ["curiosity", "connection"] : LEVELS.map((level) => level.id);
 }
 
-function eligiblePromptsForMode(mode) {
+function normalizePromptFilters(mode, promptFilters) {
+  const hasFilters = Boolean(promptFilters) &&
+    (Boolean(promptFilters.includeSpicy) || Boolean(promptFilters.tags?.length));
+  if (mode !== "date_night" && hasFilters) {
+    fail("Custom themes are only available for A Table 4 Two.");
+  }
+  if (mode !== "date_night") {
+    return { tags: [], includeSpicy: false };
+  }
+  const tags = Array.isArray(promptFilters?.tags)
+    ? [...new Set(promptFilters.tags.map((tag) => String(tag).trim()).filter(Boolean))]
+    : [];
+  return {
+    tags,
+    includeSpicy: Boolean(promptFilters?.includeSpicy)
+  };
+}
+
+function eligiblePromptsForMode(mode, promptFilters = { tags: [], includeSpicy: false }) {
   const audience = MODE_AUDIENCE[mode];
   const levelIds = levelIdsForMode(mode);
-  return PROMPTS.filter((prompt) => prompt.audiences.includes(audience) && levelIds.includes(prompt.level));
+  return PROMPTS.filter((prompt) =>
+    prompt.audiences.includes(audience) &&
+    levelIds.includes(prompt.level) &&
+    (!prompt.experiences || prompt.experiences.includes(mode)) &&
+    (!prompt.isSpicy || promptFilters.includeSpicy) &&
+    (mode !== "date_night" || promptFilters.tags.length === 0 ||
+      prompt.tags?.some((tag) => promptFilters.tags.includes(tag)))
+  );
 }
 
 function player(match, playerId) {
@@ -199,17 +224,23 @@ function selectIcebreakerTarget(next, random) {
   return selected;
 }
 
-export function createAdaptiveMatch({ mode, participants, random = Math.random }) {
+export function createAdaptiveMatch({ mode, participants, random = Math.random, promptFilters }) {
   const normalizedMode = normalizeAdaptiveMode(mode);
   if (!isAdaptiveMode(normalizedMode)) {
     fail("Unknown adaptive experience.");
   }
+  const normalizedFilters = normalizePromptFilters(normalizedMode, promptFilters);
+  const eligiblePrompts = eligiblePromptsForMode(normalizedMode, normalizedFilters);
   const decksByLevel = Object.fromEntries(levelIdsForMode(normalizedMode).map((levelId) => [
     levelId,
-    shuffle(eligiblePromptsForMode(normalizedMode)
+    shuffle(eligiblePrompts
       .filter((prompt) => prompt.level === levelId)
       .map((prompt) => prompt.id), random)
   ]));
+  if (normalizedMode === "date_night" &&
+    Object.values(decksByLevel).some((deck) => deck.length < 2)) {
+    fail("Choose more themes; A Table 4 Two needs at least 2 prompts in every level.");
+  }
   const players = participants.map((participant) => ({
     ...participant,
     connected: true,
@@ -235,6 +266,7 @@ export function createAdaptiveMatch({ mode, participants, random = Math.random }
     endReason: null,
     ...(normalizedMode === "date_night"
       ? {
+          promptFilters: normalizedFilters,
           connectionScore: 0,
           completedByLevel: { curiosity: 0, connection: 0, reflection: 0 },
           endingChoice: null,
@@ -279,7 +311,7 @@ function startExperience(next, actorId) {
     fail("This experience has already started.");
   }
   if (next.mode === "date_night" && next.players.length !== 2) {
-    fail("Date Night starts with exactly two participants.");
+    fail("A Table 4 Two starts with exactly two participants.");
   }
   if (next.mode !== "date_night" && (next.players.length < 3 || next.players.length > 6)) {
     fail("This experience starts with 3 to 6 participants.");
@@ -338,7 +370,7 @@ function resolveDateAction(next, actorId, action) {
     rotateOrExhaust(next);
     return;
   }
-  fail("That action is unavailable in Date Night.");
+  fail("That action is unavailable in A Table 4 Two.");
 }
 
 function resolveInnerAction(next, actorId, action, payload) {

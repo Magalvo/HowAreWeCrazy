@@ -15,7 +15,10 @@ export function createSession({ audience, playerNames = "", cardsPerLevel = 6, r
   const cardsByLevel = Object.fromEntries(
     LEVELS.map((level) => {
       const available = PROMPTS.filter(
-        (prompt) => prompt.level === level.id && prompt.audiences.includes(audience)
+        (prompt) => prompt.level === level.id &&
+          prompt.audiences.includes(audience) &&
+          !prompt.isSpicy &&
+          !prompt.experiences
       );
       return [level.id, shuffle(available, random).slice(0, cardsPerLevel).map((prompt) => prompt.id)];
     })

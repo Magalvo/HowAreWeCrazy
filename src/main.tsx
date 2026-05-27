@@ -15,7 +15,7 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
 const root = document.querySelector<HTMLDivElement>("#root");
 
 if (!root) {
-  throw new Error("Open Thread application root was not found.");
+  throw new Error("How Are We Crazy application root was not found.");
 }
 
 createRoot(root).render(<App />);

@@ -5,6 +5,7 @@ import {
   createAdaptiveMatch,
   performAdaptiveAction
 } from "../adaptive-engine.js";
+import { promptById } from "../data/prompts.js";
 
 const pair = [
   { id: "host", name: "Host", role: "host" },
@@ -16,12 +17,28 @@ const group = [
   { id: "p3", name: "Dev", role: "player" }
 ];
 
-function start(mode, participants = group) {
-  const lobby = createAdaptiveMatch({ mode, participants, random: () => 0.2 });
+function start(mode, participants = group, options = {}) {
+  const lobby = createAdaptiveMatch({ mode, participants, random: () => 0.2, ...options });
   return performAdaptiveAction(lobby, "host", "start_match");
 }
 
-test("Date Night requires two players and reveals responder-selected prompts publicly", () => {
+test("supplied tagged prompts are mapped with safe metadata", () => {
+  for (let index = 101; index <= 135; index += 1) {
+    assert.ok(promptById(`q${index}`), `q${index} should exist`);
+  }
+  assert.equal(promptById("q101").level, "curiosity");
+  assert.deepEqual(promptById("q101").tags, ["Identity"]);
+  assert.equal(promptById("q101").isSpicy, false);
+  assert.equal(promptById("q110").level, "connection");
+  assert.equal(promptById("q120").level, "reflection");
+  for (let index = 131; index <= 135; index += 1) {
+    assert.equal(promptById(`q${index}`).isSpicy, true);
+  }
+  assert.equal(promptById("q131").audiences.includes("couple"), false);
+  assert.equal(promptById("q135").audiences.includes("couple"), false);
+});
+
+test("A Table 4 Two requires two players and reveals responder-selected prompts publicly", () => {
   const solo = createAdaptiveMatch({ mode: "date_night", participants: [pair[0]], random: () => 0.2 });
   assert.throws(() => performAdaptiveAction(solo, "host", "start_match"), /exactly two/);
 
@@ -33,7 +50,7 @@ test("Date Night requires two players and reveals responder-selected prompts pub
   assert.equal(match.activePlayerId, "p2");
 });
 
-test("Date Night requires depth variety before its shared ending and makes reward final", () => {
+test("A Table 4 Two requires depth variety before its shared ending and makes reward final", () => {
   let match = start("date_night", pair);
   match.connectionScore = 20;
   match.completedByLevel = { curiosity: 2, connection: 2, reflection: 1 };
@@ -55,7 +72,7 @@ test("Date Night requires depth variety before its shared ending and makes rewar
   assert.match(questionMatch.revealedReward.id, /^question-/);
 });
 
-test("Date Night passing rotates safely without adding shared points", () => {
+test("A Table 4 Two passing rotates safely without adding shared points", () => {
   let match = start("date_night", pair);
   match = performAdaptiveAction(match, "host", "choose_level", { levelId: "curiosity" });
   match = performAdaptiveAction(match, "host", "pass");
@@ -63,9 +80,65 @@ test("Date Night passing rotates safely without adding shared points", () => {
   assert.equal(match.activePlayerId, "p2");
 });
 
+test("A Table 4 Two includes tagged date prompts while other adaptive modes do not", () => {
+  let match = start("date_night", pair);
+  assert.equal(Object.values(match.decksByLevel).flat().length, 76);
+  assert.ok(Object.values(match.decksByLevel).flat().includes("d106"));
+  assert.ok(Object.values(match.decksByLevel).flat().includes("q101"));
+  assert.equal(Object.values(match.decksByLevel).flat().includes("q132"), false);
+  assert.deepEqual(promptById("d315").tags, ["Meta", "Intimacy"]);
+
+  match.decksByLevel.curiosity = ["d106"];
+  match = performAdaptiveAction(match, "host", "choose_level", { levelId: "curiosity" });
+  assert.deepEqual(adaptiveView(match, "p2").currentChallenge.prompt.tags, ["Habits", "Travel"]);
+
+  const inner = start("inner_circle");
+  const icebreaker = start("icebreaker");
+  assert.equal(Object.values(inner.decksByLevel).flat().some((id) => id.startsWith("d")), false);
+  assert.equal(Object.values(icebreaker.decksByLevel).flat().some((id) => id.startsWith("d")), false);
+});
+
+test("A Table 4 Two custom themes use OR matching and keep spicy prompts opt-in", () => {
+  let match = start("date_night", pair, {
+    promptFilters: { tags: ["Future", "Romance"], includeSpicy: false }
+  });
+  let ids = Object.values(match.decksByLevel).flat();
+  assert.ok(ids.includes("q102"));
+  assert.ok(ids.includes("q106"));
+  assert.equal(ids.includes("q132"), false);
+  assert.equal(ids.every((id) => promptById(id).tags?.some((tag) => ["Future", "Romance"].includes(tag))), true);
+
+  match = start("date_night", pair, {
+    promptFilters: { tags: ["Romance"], includeSpicy: true }
+  });
+  ids = Object.values(match.decksByLevel).flat();
+  assert.ok(ids.includes("q132"));
+  assert.ok(ids.includes("q134"));
+  assert.equal(ids.includes("q131"), false);
+});
+
+test("A Table 4 Two rejects too-narrow filters and other modes reject custom filters", () => {
+  assert.throws(
+    () => createAdaptiveMatch({
+      mode: "date_night",
+      participants: pair,
+      promptFilters: { tags: ["Childhood"], includeSpicy: false }
+    }),
+    /at least 2 prompts/
+  );
+  assert.throws(
+    () => createAdaptiveMatch({
+      mode: "inner_circle",
+      participants: group,
+      promptFilters: { tags: ["Identity"], includeSpicy: false }
+    }),
+    /only available for A Table 4 Two/
+  );
+});
+
 test("Inner Circle filters friends prompts and keeps previews private until targeting", () => {
   let match = start("inner_circle");
-  assert.equal(Object.values(match.decksByLevel).flat().length, 31);
+  assert.equal(Object.values(match.decksByLevel).flat().length, 61);
   match = performAdaptiveAction(match, "host", "choose_level", { levelId: "connection" });
   assert.ok(adaptiveView(match, "host").currentChallenge.prompt.text);
   assert.equal(adaptiveView(match, "p2").currentChallenge.prompt, undefined);
@@ -134,7 +207,7 @@ test("Inner Circle finishes an exhausted deck with tied high scores", () => {
 test("Icebreaker draws only light levels, hides unspun prompts, and cycles responders fairly", () => {
   let match = start("icebreaker");
   assert.deepEqual(Object.keys(match.decksByLevel), ["curiosity", "connection"]);
-  assert.equal(Object.values(match.decksByLevel).flat().length, 21);
+  assert.equal(Object.values(match.decksByLevel).flat().length, 40);
   match = performAdaptiveAction(match, "host", "choose_level", { levelId: "connection" });
   assert.equal(adaptiveView(match, "host").currentChallenge.prompt, undefined);
   assert.equal(adaptiveView(match, "host").currentChallenge.promptId, undefined);

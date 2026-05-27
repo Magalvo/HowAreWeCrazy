@@ -15,6 +15,10 @@
     "check": "node --check game-engine.js && node --check adaptive-engine.js && node --check data/prompts.js && node --check data/date-rewards.js && node --check server/room-store.js && node --check server/app-server.js && node --check scripts/dev-server.mjs && tsc --noEmit && node --test"
   },
   "dependencies": {
+    "@iconify-react/ic": "^1.0.2",
+    "@iconify-react/twemoji": "^1.0.2",
+    "@types/qrcode": "^1.5.6",
+    "qrcode": "^1.5.4",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },
