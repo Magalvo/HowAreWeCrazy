@@ -1,9 +1,11 @@
 import { resolve } from "node:path";
 import { createAppServer } from "../server/app-server.js";
 
-const root = resolve(process.cwd());
+const production = process.argv.includes("--production");
+const root = resolve(process.cwd(), production ? "dist" : ".");
 const port = Number(process.env.PORT || 4173);
 
 createAppServer({ root }).listen(port, "0.0.0.0", () => {
-  console.log(`Open Thread is running at http://localhost:${port}`);
+  const role = production ? "production app" : "room API";
+  console.log(`Open Thread ${role} is running at http://localhost:${port}`);
 });

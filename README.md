@@ -23,9 +23,24 @@ and save prompts they want to revisit.
 npm run dev
 ```
 
-Open `http://localhost:4173` on a desktop. To join a live room from phones on the same
-Wi-Fi network, open the development machine's network address with port `4173`, then enter
+This runs the Node room API and the React/Vite web client together. Open
+`http://localhost:5173` on a desktop. To join a live room from phones on the same
+Wi-Fi network, open the development machine's network address with port `5173`, then enter
 the room code or open the invite link copied by the host.
+
+## Frontend Architecture
+
+The web client now runs through React, Vite, and TypeScript. React owns setup, local
+Conversation play, adaptive live-room screens, saved prompts, and live room updates.
+The pure JavaScript game engines and Node room API remain independent of the interface,
+so future UX work can iterate without rewriting server rule enforcement.
+
+```bash
+npm run build
+```
+
+The production build writes `dist/`; `npm start` serves that built client together with
+the room API and Server-Sent Events endpoint.
 
 ## Deploy A Phone Playtest On Render
 
