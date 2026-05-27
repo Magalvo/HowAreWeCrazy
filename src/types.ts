@@ -66,6 +66,7 @@ export interface AdaptiveSession {
   availableActions: string[];
   activePlayerId?: string;
   targetPlayerId?: string | null;
+  currentResponderId?: string | null;
   turnNumber: number;
   scoreTarget: number;
   remainingByLevel: Record<string, number>;

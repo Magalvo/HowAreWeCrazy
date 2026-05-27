@@ -14,7 +14,7 @@ import {
   totalCards
 } from "../game-engine.js";
 import { LEVELS, PROMPTS, promptById } from "../data/prompts.js";
-import { LEVEL_POINTS } from "../adaptive-engine.js";
+import { adaptiveView, createAdaptiveMatch, LEVEL_POINTS, performAdaptiveAction } from "../adaptive-engine.js";
 import { createI18n, LANGUAGES, type Language } from "./i18n";
 import type {
   ActiveRoom,
@@ -105,6 +105,19 @@ function audienceLabel(audience: Audience): string {
   return { couple: "two people", friends: "friends", group: "a group" }[audience];
 }
 
+function pairNames(playerNames: string) {
+  const names = playerNames
+    .split(/[+,&/]/)
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .slice(0, 2);
+  return [names[0] || "Partner 1", names[1] || "Partner 2"];
+}
+
+function localAdaptiveViewerId(session: AdaptiveSession) {
+  return session.currentResponderId || session.activePlayerId || session.players[0]?.id || "";
+}
+
 async function requestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...options,
@@ -150,8 +163,11 @@ export function App() {
   const deferredSpinRef = useRef<RoomSnapshot | null>(null);
   const toastTimerRef = useRef<number | null>(null);
 
-  const adaptive = isAdaptiveRoom(activeRoom) && session && "mode" in session
-    ? session as AdaptiveSession
+  const adaptiveMatch = session && "mode" in session ? session as AdaptiveSession : null;
+  const adaptive = adaptiveMatch
+    ? activeRoom
+      ? adaptiveMatch
+      : adaptiveView(adaptiveMatch, localAdaptiveViewerId(adaptiveMatch)) as AdaptiveSession
     : null;
   const conversation = !adaptive && session ? session as ConversationSession : null;
   const host = !activeRoom || activeRoom.role === "host";
@@ -169,7 +185,7 @@ export function App() {
 
   useEffect(() => {
     const theme = adaptive?.mode ||
-      (screen === "setup" && playMode === "host" ? normalizeExperience(roomMode) : "conversation");
+      (screen === "setup" && playMode !== "join" ? normalizeExperience(roomMode) : "conversation");
     document.body.dataset.experience = theme;
   }, [adaptive?.mode, playMode, roomMode, screen]);
 
@@ -290,6 +306,13 @@ export function App() {
     window.scrollTo(0, 0);
   }
 
+  function choosePlayMode(nextMode: PlayMode) {
+    setPlayMode(nextMode);
+    if (nextMode === "local" && !["conversation", "date_night"].includes(roomMode)) {
+      setRoomMode("conversation");
+    }
+  }
+
   function toggleThemeTag(tag: string) {
     setSelectedThemeTags((current) =>
       current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag]);
@@ -344,6 +367,21 @@ export function App() {
       return;
     }
     leaveRoom();
+    if (roomMode === "date_night") {
+      const [firstName, secondName] = pairNames(playerNames);
+      const lobby = createAdaptiveMatch({
+        mode: "date_night",
+        participants: [
+          { id: "local-1", name: firstName, role: "host" },
+          { id: "local-2", name: secondName, role: "player" }
+        ],
+        promptFilters: { tags: selectedThemeTags, includeSpicy }
+      });
+      const started = performAdaptiveAction(lobby, "local-1", "start_match");
+      setSession(started as AdaptiveSession);
+      setScreen("adaptive");
+      return;
+    }
     const next = createSession(options) as ConversationSession;
     setSession(next);
     setScreen("game");
@@ -365,6 +403,22 @@ export function App() {
   }
 
   async function sendRoomAction(action: string, payload: Record<string, unknown> = {}) {
+    if (adaptiveMatch && !activeRoom) {
+      if (pending) {
+        return;
+      }
+      setPending(true);
+      try {
+        const actorId = localAdaptiveViewerId(adaptiveMatch);
+        const next = performAdaptiveAction(adaptiveMatch, actorId, action, payload);
+        setSession(next as AdaptiveSession);
+      } catch (error) {
+        notice((error as Error).message);
+      } finally {
+        setPending(false);
+      }
+      return;
+    }
     if (!activeRoom || pending || (!isAdaptiveRoom(activeRoom) && !host)) {
       return;
     }
@@ -466,6 +520,12 @@ export function App() {
 
   const resumeText = useMemo(() => {
     if (!session) return "";
+    if (adaptive && !activeRoom) {
+      return i18n.t("{experience}: playing turn {turn}.", {
+        experience: experienceLabel(adaptive.mode),
+        turn: adaptive.turnNumber || 1
+      });
+    }
     if (adaptive && activeRoom) {
       const state = adaptive.status === "lobby" ? "waiting in the lobby" :
         adaptive.status === "finished" ? "ready to review results" :
@@ -525,7 +585,7 @@ export function App() {
             joinCode={joinCode}
             joinName={joinName}
             joinAgreement={joinAgreement}
-            onPlayMode={setPlayMode}
+            onPlayMode={choosePlayMode}
             onRoomMode={setRoomMode}
             onAudience={setAudience}
             onPlayerNames={setPlayerNames}
@@ -544,10 +604,16 @@ export function App() {
             onJoin={(event) => void handleJoinSubmit(event)}
           />
         )}
-        {screen === "adaptive" && adaptive && snapshot && (
+        {screen === "adaptive" && adaptive && (
           <AdaptiveRoomScreen
             session={adaptive}
-            snapshot={snapshot as RoomSnapshot<AdaptiveSession>}
+            snapshot={(snapshot || {
+              code: "LOCAL",
+              mode: adaptive.mode,
+              participants: adaptive.players,
+              session: adaptive,
+              viewerId: localAdaptiveViewerId(adaptive)
+            }) as RoomSnapshot<AdaptiveSession>}
             savedIds={savedIds}
             pending={pending}
             spinning={spinning}
@@ -555,6 +621,7 @@ export function App() {
             onAction={(action, payload) => void sendRoomAction(action, payload)}
             onSave={toggleSaved}
             onLeave={() => { leaveRoom(); goTo("setup"); }}
+            local={!activeRoom}
           />
         )}
         {screen === "game" && conversation && (
@@ -805,7 +872,8 @@ function SetupScreen(props: {
   onJoin: (event: FormEvent) => void;
 }) {
   const { t, tag } = useI18n();
-  const adaptive = props.playMode === "host" && props.roomMode !== "conversation";
+  const adaptive = props.playMode === "host" && props.roomMode !== "conversation" ||
+    props.playMode === "local" && props.roomMode === "date_night";
   const helper = {
     conversation: "Everyone follows one shared deck. No scores, only space to answer or pass.",
     date_night: "Work together toward a shared milestone, then choose a closing moment.",
@@ -813,9 +881,11 @@ function SetupScreen(props: {
     icebreaker: "A fair spin chooses responders while everyone builds group progress."
   }[props.roomMode];
   const startText = adaptive
-    ? t("Create {experience} room", { experience: experienceLabel(props.roomMode) })
+    ? props.playMode === "host"
+      ? t("Create {experience} room", { experience: experienceLabel(props.roomMode) })
+      : t("Start {experience}", { experience: experienceLabel(props.roomMode) })
     : props.playMode === "host" ? t("Create live room") : t("Start the conversation");
-  const dateNightThemeInvalid = props.playMode === "host" &&
+  const dateNightThemeInvalid = props.playMode !== "join" &&
     props.roomMode === "date_night" &&
     !props.dateNightFiltersValid;
   return (
@@ -870,6 +940,25 @@ function SetupScreen(props: {
               <input value={props.hostName} onChange={(event) => props.onHostName(event.target.value)} maxLength={28} placeholder="Maya" />
             </label>
           )}
+          {props.playMode === "local" && (
+            <fieldset>
+              <legend>{t("Choose a format")}</legend>
+              <div className="rule-grid">
+                {([
+                  ["conversation", "Unscored", "Conversation", "A gentle shared deck for open conversation."],
+                  ["date_night", "2 players | Shared goal", "A Table 4 Two", "Build a connection milestone together."]
+                ] as const).map(([value, meta, title, copy]) => (
+                  <label className="rule-choice" key={value}>
+                    <input type="radio" checked={props.roomMode === value} onChange={() => props.onRoomMode(value)} />
+                    <span className="rule-meta">{t(meta)}</span>
+                    <span className="choice-title">{t(title)}</span>
+                    <span className="choice-copy">{t(copy)}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="experience-helper">{t(helper)}</p>
+            </fieldset>
+          )}
           {props.playMode === "host" && (
             <fieldset>
               <legend>{t("Choose an experience")}</legend>
@@ -891,7 +980,7 @@ function SetupScreen(props: {
               <p className="experience-helper">{t(helper)}</p>
             </fieldset>
           )}
-          {props.playMode === "host" && props.roomMode === "date_night" && (
+          {(props.playMode === "host" || props.playMode === "local") && props.roomMode === "date_night" && (
             <fieldset className="theme-panel">
               <legend>{t("Choose your themes")}</legend>
               <div className="theme-heading">
@@ -989,7 +1078,8 @@ function AdaptiveRoomScreen({
   onInvite,
   onAction,
   onSave,
-  onLeave
+  onLeave,
+  local = false
 }: {
   session: AdaptiveSession;
   snapshot: RoomSnapshot<AdaptiveSession>;
@@ -1000,6 +1090,7 @@ function AdaptiveRoomScreen({
   onAction: (action: string, payload?: Record<string, unknown>) => void;
   onSave: (id: string) => void;
   onLeave: () => void;
+  local?: boolean;
 }) {
   const { prompt: localizePrompt, t } = useI18n();
   const hasAction = (action: string) => session.availableActions.includes(action);
@@ -1022,10 +1113,10 @@ function AdaptiveRoomScreen({
       <aside className="room-banner">
         <div className="room-heading">
           <div>
-            <p className="eyebrow">{experienceLabel(session.mode)}</p>
-            <p className="room-code">{snapshot.code}</p>
+            <p className="eyebrow">{local ? t("One phone") : experienceLabel(session.mode)}</p>
+            {!local && <p className="room-code">{snapshot.code}</p>}
           </div>
-          <button className="ghost-button" onClick={onInvite}>{t("Share invite")}</button>
+          {!local && <button className="ghost-button" onClick={onInvite}>{t("Share invite")}</button>}
         </div>
         <div className="participant-list">
           {session.players.map((participant) => (
