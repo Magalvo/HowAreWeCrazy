@@ -26,6 +26,16 @@ async function postJson(origin, path, body) {
   });
 }
 
+test("health endpoint confirms that a deployed instance is ready", async (t) => {
+  const { server, origin } = await openTestServer();
+  t.after(() => server.close());
+
+  const response = await fetch(`${origin}/health`);
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true });
+});
+
 test("room API creates, joins, and allows the host to reveal the shared card", async (t) => {
   const { server, origin } = await openTestServer();
   t.after(() => server.close());

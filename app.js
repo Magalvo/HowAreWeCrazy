@@ -27,6 +27,7 @@ const elements = {
   startButton: document.querySelector("#start-button"),
   hostNameField: document.querySelector("#host-name-field"),
   roomRulesField: document.querySelector("#room-rules-field"),
+  experienceHelper: document.querySelector("#experience-helper"),
   audienceField: document.querySelector("#audience-field"),
   cardsPerLevelField: document.querySelector("#cards-per-level-field"),
   resumeCard: document.querySelector("#resume-card"),
@@ -47,6 +48,7 @@ const elements = {
   pointsRoomLabel: document.querySelector("#points-room-label"),
   pointsParticipantList: document.querySelector("#points-participant-list"),
   pointsLobby: document.querySelector("#points-lobby"),
+  pointsLobbyTitle: document.querySelector("#points-lobby-title"),
   pointsLobbyCopy: document.querySelector("#points-lobby-copy"),
   pointsStart: document.querySelector("#points-start-match-button"),
   pointsMatch: document.querySelector("#points-match"),
@@ -59,6 +61,7 @@ const elements = {
   pointsMeterValue: document.querySelector("#points-meter-value"),
   pointsMeterBar: document.querySelector("#points-meter-bar"),
   pointsLevelProgress: document.querySelector("#points-level-progress"),
+  pointsScorePanel: document.querySelector("#points-score-panel"),
   pointsScoreboard: document.querySelector("#points-scoreboard"),
   pointsGuidance: document.querySelector("#points-guidance"),
   pointsLevelPicker: document.querySelector("#points-level-picker"),
@@ -67,9 +70,14 @@ const elements = {
   doubleDownToggle: document.querySelector("#double-down-toggle"),
   pointsCard: document.querySelector("#points-card"),
   pointsCardLabel: document.querySelector("#points-card-label"),
+  pointsVisibilityLabel: document.querySelector("#points-visibility-label"),
   pointsQuestion: document.querySelector("#points-question"),
   pointsTargetPicker: document.querySelector("#points-target-picker"),
+  pointsTargetCopy: document.querySelector("#points-target-copy"),
   pointsTargetActions: document.querySelector("#points-target-actions"),
+  pointsWaitingStage: document.querySelector("#points-waiting-stage"),
+  pointsWaitingLabel: document.querySelector("#points-waiting-label"),
+  pointsWaitingCopy: document.querySelector("#points-waiting-copy"),
   pointsEndingPicker: document.querySelector("#points-ending-picker"),
   pointsActivity: document.querySelector("#points-activity-button"),
   pointsQuestionEnding: document.querySelector("#points-question-button"),
@@ -81,6 +89,7 @@ const elements = {
   pointsDiscard: document.querySelector("#points-discard-button"),
   pointsSave: document.querySelector("#points-save-button"),
   pointsSkip: document.querySelector("#points-skip-button"),
+  pointsActions: document.querySelector("#points-actions"),
   pointsResultEyebrow: document.querySelector("#points-result-eyebrow"),
   pointsResultTitle: document.querySelector("#points-result-title"),
   pointsResultCopy: document.querySelector("#points-result-copy"),
@@ -99,6 +108,7 @@ let previousScreen = "setup";
 let visibleScreen = "setup";
 let installPrompt;
 let roomActionPending = false;
+let pendingSpinSnapshot = null;
 
 function loadJson(key) {
   try {
@@ -119,6 +129,14 @@ function experienceLabel(mode = activeRoom?.mode) {
     competitive: "Inner Circle",
     icebreaker: "Icebreaker"
   }[mode] || "Conversation";
+}
+
+function normalizedExperience(mode) {
+  return mode === "competitive" ? "inner_circle" : mode || "conversation";
+}
+
+function applyExperienceTheme(mode) {
+  document.body.dataset.experience = normalizedExperience(mode);
 }
 
 function isHost() {
@@ -175,11 +193,19 @@ function selectedRoomMode() {
 
 function updateRoomModeFields() {
   const adaptive = selectedPlayMode() === "host" && selectedRoomMode() !== "conversation";
+  const selectedMode = selectedRoomMode();
   elements.audienceField.hidden = adaptive;
   elements.cardsPerLevelField.hidden = adaptive;
   elements.startButton.textContent = adaptive ? `Create ${experienceLabel(selectedRoomMode())} room` : selectedPlayMode() === "host"
     ? "Create live room"
     : "Start the conversation";
+  elements.experienceHelper.textContent = {
+    conversation: "Everyone follows one shared deck. No scores, only space to answer or pass.",
+    date_night: "Work together toward a shared milestone, then choose a closing moment.",
+    inner_circle: "Private draws and points stay playful through balanced target cooldowns.",
+    icebreaker: "A fair spin chooses responders while everyone builds group progress."
+  }[selectedMode];
+  applyExperienceTheme(selectedPlayMode() === "host" ? selectedMode : "conversation");
 }
 
 function setPlayMode(mode) {
@@ -195,6 +221,9 @@ function setPlayMode(mode) {
 }
 
 function updateSetup() {
+  if (activeRoom && isAdaptiveRoom() && session) {
+    applyExperienceTheme(session.mode);
+  }
   const canResume = Boolean(activeRoom ? session : session && !session.completed);
   elements.resumeCard.hidden = !canResume;
   if (!canResume) {
@@ -265,6 +294,7 @@ function updateConversationRoomDetails() {
 }
 
 function updateConversationGame() {
+  applyExperienceTheme("conversation");
   const level = currentLevel(session);
   const card = currentCard(session);
   const position = currentPosition(session);
@@ -300,6 +330,7 @@ function updateConversationGame() {
 }
 
 function updateConversationTransition() {
+  applyExperienceTheme("conversation");
   const completedLevel = LEVELS[session.levelIndex - 1];
   const nextLevel = currentLevel(session);
   document.querySelector("#completed-level").textContent = `${completedLevel.name} complete`;
@@ -312,6 +343,7 @@ function updateConversationTransition() {
 }
 
 function finishConversation() {
+  applyExperienceTheme("conversation");
   const name = session.playerNames || "your table";
   document.querySelector("#results-copy").textContent =
     `You completed ${totalCards(session)} prompts with ${name}. Keep the saved cards for a later conversation.`;
@@ -333,7 +365,7 @@ function renderPlayerChips() {
   session.players.forEach((participant) => {
     const chip = document.createElement("span");
     chip.className = `participant-chip${participant.connected ? "" : " is-offline"}`;
-    chip.textContent = `${participant.name}${participant.role === "host" ? " - host" : ""}${participant.connected ? "" : " - offline"}`;
+    chip.textContent = `${participant.name}${participant.role === "host" ? " - host" : ""}${participant.connected ? "" : " - unavailable"}`;
     elements.pointsParticipantList.append(chip);
   });
 }
@@ -365,7 +397,7 @@ function renderScores(container, final = false) {
 function renderSharedMeter() {
   const shared = session.mode !== "inner_circle";
   elements.pointsSharedMeter.hidden = !shared;
-  elements.pointsScoreboard.hidden = shared;
+  elements.pointsScorePanel.hidden = shared;
   if (!shared) {
     elements.pointsGoalCopy.textContent = "First to 21";
     return;
@@ -476,12 +508,33 @@ function promptIsPublic() {
   return session.phase === "await_response";
 }
 
+function renderWaitingStage() {
+  const waitingForReveal = !session.currentChallenge?.prompt &&
+    (session.mode === "icebreaker" && session.phase === "spin_target" ||
+      session.mode === "inner_circle" && ["preview_card", "replacement_preview"].includes(session.phase));
+  elements.pointsWaitingStage.hidden = !waitingForReveal;
+  if (!waitingForReveal) {
+    return;
+  }
+  if (session.mode === "icebreaker") {
+    elements.pointsWaitingLabel.textContent = "Prompt concealed";
+    elements.pointsWaitingCopy.textContent = hasPointsAction("spin_target")
+      ? "Spin when the room is ready. The prompt appears once a responder is chosen."
+      : "The facilitator is spinning for a responder.";
+    return;
+  }
+  elements.pointsWaitingLabel.textContent = "Private preview";
+  elements.pointsWaitingCopy.textContent = "The active player is choosing who receives this prompt.";
+}
+
 function renderPointsCard() {
   const challenge = session.currentChallenge;
   const prompt = challenge?.prompt;
   const publicPrompt = promptIsPublic();
   elements.pointsCard.hidden = !prompt;
   elements.pointsTargetPicker.hidden = true;
+  elements.pointsSave.hidden = true;
+  elements.pointsTargetActions.replaceChildren();
   if (!prompt) {
     return;
   }
@@ -489,10 +542,14 @@ function renderPointsCard() {
   const value = challenge.doubled && !challenge.claimant ? challenge.basePoints * 2 : challenge.basePoints;
   elements.pointsCardLabel.textContent =
     `${level.name} - ${value} point${value === 1 ? "" : "s"}${challenge.doubled ? " - Double Down" : ""}`;
+  elements.pointsVisibilityLabel.textContent = !publicPrompt
+    ? "Only visible on your phone"
+    : session.mode === "date_night" ? "Visible to both partners"
+      : "Visible to the room";
   elements.pointsQuestion.textContent = prompt.text;
   if (session.mode === "inner_circle" && hasPointsAction("target_player")) {
     elements.pointsTargetPicker.hidden = false;
-    elements.pointsTargetActions.replaceChildren();
+    elements.pointsTargetCopy.textContent = "Prompts are spread around the group. Cooling down players return in the next cycle.";
     session.players
       .filter((item) => item.id !== roomSnapshot.viewerId && item.connected && item.id !== challenge.excludedTargetId)
       .forEach((item) => {
@@ -526,6 +583,7 @@ function renderPointsActions() {
     button.hidden = !hasPointsAction(action);
     button.disabled = roomActionPending;
   });
+  elements.pointsActions.hidden = actionButtons.every(([button]) => button.hidden) && elements.pointsSave.hidden;
 }
 
 function renderEndingPicker() {
@@ -573,6 +631,7 @@ function renderAdaptiveResults() {
 }
 
 function renderAdaptiveMode() {
+  applyExperienceTheme(session.mode);
   elements.pointsRoomCode.textContent = roomSnapshot.code;
   elements.pointsRoomLabel.textContent = experienceLabel(session.mode);
   renderPlayerChips();
@@ -582,6 +641,7 @@ function renderAdaptiveMode() {
 
   if (session.status === "lobby") {
     if (session.mode === "date_night") {
+      elements.pointsLobbyTitle.textContent = "An evening for two.";
       elements.pointsLobbyCopy.textContent = session.players.length === 1
         ? "Waiting for one partner to join this shared Date Night."
         : "Both partners are here. The host can begin when you are comfortable.";
@@ -589,6 +649,9 @@ function renderAdaptiveMode() {
     } else {
       const needed = Math.max(0, 3 - session.players.length);
       const group = session.mode === "inner_circle" ? "friends" : "players";
+      elements.pointsLobbyTitle.textContent = session.mode === "inner_circle"
+        ? "Gather your inner circle."
+        : "Open the room gently.";
       elements.pointsLobbyCopy.textContent = needed > 0
         ? `Waiting for ${needed} more ${group === "friends" ? "friend" : "player"}${needed === 1 ? "" : "s"} before you begin.`
         : `${session.players.length} ${group} are ready. The host can begin when everyone is settled.`;
@@ -609,6 +672,7 @@ function renderAdaptiveMode() {
     }
     elements.pointsGuidance.textContent = pointsGuidance();
     renderLevelPicker();
+    renderWaitingStage();
     renderPointsCard();
     renderPointsActions();
     renderEndingPicker();
@@ -679,6 +743,11 @@ function stopRoomEvents() {
 }
 
 function applyRoomSnapshot(snapshot, { openGame = !["setup", "library"].includes(visibleScreen) } = {}) {
+  if (roomActionPending && elements.pointsMatch.classList.contains("is-spinning") &&
+    snapshot.session?.phase === "await_response") {
+    pendingSpinSnapshot = snapshot;
+    return;
+  }
   roomSnapshot = snapshot;
   session = snapshot.session;
   if (openGame) {
@@ -748,18 +817,31 @@ async function sendRoomAction(action, payload = {}) {
     return;
   }
   roomActionPending = true;
+  const spinning = action === "spin_target";
+  if (spinning) {
+    elements.pointsMatch.classList.add("is-spinning");
+  }
   try {
     const authorization = isAdaptiveRoom()
       ? { participantToken: activeRoom.participantToken }
       : { hostToken: activeRoom.hostToken };
-    applyRoomSnapshot(await requestJson(`/api/rooms/${activeRoom.code}/actions`, {
+    const request = requestJson(`/api/rooms/${activeRoom.code}/actions`, {
       method: "POST",
       body: JSON.stringify({ action, ...authorization, ...payload })
-    }));
+    });
+    const snapshot = spinning
+      ? (await Promise.all([request, new Promise((resolve) => window.setTimeout(resolve, 480))]))[0]
+      : await request;
+    if (spinning) {
+      elements.pointsMatch.classList.remove("is-spinning");
+    }
+    applyRoomSnapshot(pendingSpinSnapshot || snapshot);
   } catch (error) {
     showToast(error.message);
   } finally {
     roomActionPending = false;
+    pendingSpinSnapshot = null;
+    elements.pointsMatch.classList.remove("is-spinning");
     renderSession();
   }
 }
@@ -769,6 +851,21 @@ async function copyInvite() {
     return;
   }
   const inviteUrl = `${window.location.origin}/?room=${activeRoom.code}`;
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: `${experienceLabel()} on Open Thread`,
+        text: `Join my ${experienceLabel()} room: ${activeRoom.code}`,
+        url: inviteUrl
+      });
+      showToast("Invite shared");
+      return;
+    } catch (error) {
+      if (error.name === "AbortError") {
+        return;
+      }
+    }
+  }
   try {
     await navigator.clipboard.writeText(inviteUrl);
     showToast("Invite link copied");

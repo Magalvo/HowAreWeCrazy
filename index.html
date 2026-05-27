@@ -93,29 +93,34 @@
           </label>
 
           <fieldset id="room-rules-field" hidden>
-            <legend>Room rules</legend>
+            <legend>Choose an experience</legend>
             <div class="rule-grid">
               <label class="rule-choice">
                 <input type="radio" name="roomMode" value="conversation" checked />
+                <span class="rule-meta">Any group | Unscored</span>
                 <span class="choice-title">Conversation</span>
-                <span class="choice-copy">One shared deck, no score</span>
+                <span class="choice-copy">A gentle shared deck for open conversation.</span>
               </label>
               <label class="rule-choice">
                 <input type="radio" name="roomMode" value="date_night" />
+                <span class="rule-meta">2 players | Shared goal</span>
                 <span class="choice-title">Date Night</span>
-                <span class="choice-copy">2 phones, build connection together</span>
+                <span class="choice-copy">Build a connection milestone together.</span>
               </label>
               <label class="rule-choice">
                 <input type="radio" name="roomMode" value="inner_circle" />
+                <span class="rule-meta">3-6 friends | Points</span>
                 <span class="choice-title">Inner Circle</span>
-                <span class="choice-copy">3-6 friends, points with fair turns</span>
+                <span class="choice-copy">Playfully compete with balanced targeting.</span>
               </label>
               <label class="rule-choice">
                 <input type="radio" name="roomMode" value="icebreaker" />
+                <span class="rule-meta">3-6 players | Shared goal</span>
                 <span class="choice-title">Icebreaker</span>
-                <span class="choice-copy">3-6 players, group roulette</span>
+                <span class="choice-copy">Meet the room through fair roulette.</span>
               </label>
             </div>
+            <p class="experience-helper" id="experience-helper"></p>
           </fieldset>
 
           <label class="field" id="cards-per-level-field">
@@ -162,15 +167,16 @@
               <p class="eyebrow" id="points-room-label">Live experience</p>
               <p class="room-code" id="points-room-code"></p>
             </div>
-            <button class="ghost-button" id="points-copy-invite-button">Copy invite</button>
+            <button class="ghost-button" id="points-copy-invite-button">Share invite</button>
           </div>
           <div class="participant-list" id="points-participant-list"></div>
         </aside>
 
         <div class="points-lobby" id="points-lobby">
           <p class="eyebrow">Lobby</p>
-          <h2>Bring the table together.</h2>
+          <h2 id="points-lobby-title">Bring the table together.</h2>
           <p class="lede" id="points-lobby-copy"></p>
+          <p class="safety-note">Passing is always welcome. No explanation needed.</p>
           <button class="primary-button" id="points-start-match-button" hidden>Start match</button>
         </div>
 
@@ -190,7 +196,10 @@
             <div class="meter-track" aria-hidden="true"><span id="points-meter-bar"></span></div>
             <div class="level-progress" id="points-level-progress"></div>
           </div>
-          <div class="scoreboard" id="points-scoreboard"></div>
+          <details class="score-panel" id="points-score-panel">
+            <summary>Scoreboard</summary>
+            <div class="scoreboard" id="points-scoreboard"></div>
+          </details>
           <p class="points-guidance" id="points-guidance"></p>
 
           <div class="level-picker" id="points-level-picker" hidden>
@@ -202,11 +211,20 @@
             </label>
           </div>
 
+          <div class="waiting-stage" id="points-waiting-stage" hidden>
+            <span class="face-down-card" aria-hidden="true"></span>
+            <p class="eyebrow" id="points-waiting-label"></p>
+            <p id="points-waiting-copy"></p>
+          </div>
+
           <article class="points-card" id="points-card" hidden>
-            <p class="eyebrow" id="points-card-label"></p>
+            <div class="card-meta">
+              <p class="eyebrow" id="points-card-label"></p>
+              <p class="visibility-label" id="points-visibility-label"></p>
+            </div>
             <p class="points-question" id="points-question"></p>
             <div class="target-picker" id="points-target-picker" hidden>
-              <p>Select who receives this prompt.</p>
+              <p id="points-target-copy">Select who receives this prompt.</p>
               <div class="target-actions" id="points-target-actions"></div>
             </div>
           </article>
@@ -220,7 +238,7 @@
             </div>
           </div>
 
-          <div class="points-actions" id="points-actions">
+          <div class="points-actions action-dock" id="points-actions">
             <button class="primary-button" id="points-spin-button" hidden>Spin for responder</button>
             <button class="primary-button" id="points-complete-button" hidden>Completed</button>
             <button class="secondary-button" id="points-pass-button" hidden>Pass</button>
@@ -252,7 +270,7 @@
               <p class="eyebrow">Live room</p>
               <p class="room-code" id="room-code"></p>
             </div>
-            <button class="ghost-button" id="copy-invite-button">Copy invite</button>
+            <button class="ghost-button" id="copy-invite-button">Share invite</button>
           </div>
           <p class="room-role" id="room-role"></p>
           <div class="participant-list" id="participant-list"></div>
@@ -276,11 +294,13 @@
         </button>
 
         <p class="turn-copy" id="turn-copy">There is no right answer. Listening counts.</p>
-        <div class="play-actions">
-          <button class="secondary-button" id="save-button" disabled>Save card</button>
-          <button class="primary-button" id="next-button" disabled>Next card</button>
+        <div class="conversation-action-dock">
+          <div class="play-actions">
+            <button class="secondary-button" id="save-button" disabled>Save card</button>
+            <button class="primary-button" id="next-button" disabled>Next card</button>
+          </div>
+          <button class="text-button pass-button" id="pass-button">Pass and draw another</button>
         </div>
-        <button class="text-button pass-button" id="pass-button">Pass and draw another</button>
       </section>
 
       <section class="screen transition-screen" id="transition-screen" hidden aria-labelledby="transition-title">

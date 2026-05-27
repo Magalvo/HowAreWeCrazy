@@ -1,4 +1,4 @@
-const CACHE_NAME = "open-thread-v8";
+const CACHE_NAME = "open-thread-v9";
 const CORE_ASSETS = [
   "/",
   "/index.html",

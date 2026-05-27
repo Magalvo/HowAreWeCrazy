@@ -38,6 +38,11 @@ export function createAppServer({ root = resolve(process.cwd()), store = createR
     const joinMatch = pathname.match(/^\/api\/rooms\/([A-Z0-9]+)\/join$/i);
 
     try {
+      if (request.method === "GET" && pathname === "/health") {
+        sendJson(response, 200, { ok: true });
+        return;
+      }
+
       if (request.method === "POST" && pathname === "/api/rooms") {
         sendJson(response, 201, store.createRoom(await readJson(request)));
         return;
@@ -72,7 +77,12 @@ export function createAppServer({ root = resolve(process.cwd()), store = createR
         const unsubscribe = store.subscribe(eventsMatch[1], participantToken, (room) => {
           response.write(`event: room\ndata: ${JSON.stringify(room)}\n\n`);
         });
-        request.on("close", unsubscribe);
+        const heartbeat = setInterval(() => response.write(": keep-alive\n\n"), 25_000);
+        heartbeat.unref?.();
+        request.on("close", () => {
+          clearInterval(heartbeat);
+          unsubscribe();
+        });
         return;
       }
 

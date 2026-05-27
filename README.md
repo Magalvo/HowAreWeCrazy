@@ -27,6 +27,30 @@ Open `http://localhost:4173` on a desktop. To join a live room from phones on th
 Wi-Fi network, open the development machine's network address with port `4173`, then enter
 the room code or open the invite link copied by the host.
 
+## Deploy A Phone Playtest On Render
+
+This repository includes a [`render.yaml`](./render.yaml) Blueprint for one always-on
+Node web service in Render's Frankfurt region. It serves the installable web app, room
+API, and live updates together from one HTTPS URL.
+
+1. Push this project to a GitHub, GitLab, or Bitbucket repository.
+2. In Render, select **New > Blueprint** and connect that repository.
+3. Confirm the `open-thread-playtest` web service configuration from `render.yaml`.
+4. Deploy the Blueprint and open the provided `onrender.com` URL on the host phone.
+5. Create a live room and use **Share invite** so each participant opens the same public
+   URL on their own phone.
+
+The Blueprint uses the paid `starter` instance rather than a sleeping free service.
+Conversation sessions can include long quiet pauses, so an always-on instance avoids
+cold-start interruptions during a game. Render verifies availability through `GET /health`.
+
+### Playtest Limitation
+
+This first hosted version keeps rooms in server memory. A Render restart, redeploy, or
+service replacement ends active rooms. Treat this deployment as a live playtest build,
+not durable session hosting. The next hosting milestone is storing room/session state in
+Supabase Postgres while keeping private prompt authorization on the Node server.
+
 ## Adaptive Live Experiences
 
 When creating a live room, choose the experience that suits the table:
@@ -36,7 +60,7 @@ When creating a live room, choose the experience that suits the table:
 - `Icebreaker` has the active facilitator pick a light depth, then spin for a fair server-selected responder. The group builds toward 15 points together.
 
 Adaptive rooms live only in server memory during this prototype release, so restarting
-the local server clears active matches.
+the local or hosted server clears active matches.
 
 ## Test
 
@@ -47,7 +71,8 @@ npm run check
 
 ## Next Product Steps
 
-1. Persist rooms in a hosted database and deploy the live-room server publicly.
-2. Add authored expansion packs and a content-management workflow.
-3. Add optional accounts, purchases, and analytics only after validating repeat play.
-4. Package the PWA for app stores with Capacitor when the web experience is proven.
+1. Persist rooms in Supabase Postgres so active rooms recover after web-service restarts.
+2. Replace participant tokens in live-stream URLs with short-lived subscription tickets or secure session cookies before broader public access.
+3. Add authored expansion packs and a content-management workflow.
+4. Add optional accounts, purchases, and analytics only after validating repeat play.
+5. Package the PWA for app stores with Capacitor when the web experience is proven.
