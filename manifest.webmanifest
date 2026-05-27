@@ -1,0 +1,17 @@
+{
+  "name": "Open Thread - Conversation Cards",
+  "short_name": "Open Thread",
+  "description": "An original conversation card game for people ready to be present.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f1e8",
+  "theme_color": "#f7f1e8",
+  "icons": [
+    {
+      "src": "/assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
