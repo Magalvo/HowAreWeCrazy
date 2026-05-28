@@ -40,6 +40,23 @@ const ADAPTIVE_MODES = ["date_night", "inner_circle", "icebreaker", "competitive
 const levels = LEVELS as Level[];
 const prompts = PROMPTS as Prompt[];
 const points = LEVEL_POINTS as Record<string, number>;
+const LOCAL_DATE_REQUIRED_PROMPT_IDS = [
+  "c01",
+  "c08",
+  "c09",
+  "d106",
+  "d108",
+  "n03",
+  "n12",
+  "d210",
+  "q118",
+  "q111",
+  "r07",
+  "r12",
+  "d311",
+  "d315",
+  "q121"
+];
 type I18n = ReturnType<typeof createI18n>;
 const I18nContext = createContext<I18n>(createI18n("en"));
 
@@ -375,7 +392,8 @@ export function App() {
           { id: "local-1", name: firstName, role: "host" },
           { id: "local-2", name: secondName, role: "player" }
         ],
-        promptFilters: { tags: selectedThemeTags, includeSpicy }
+        promptFilters: { tags: selectedThemeTags, includeSpicy },
+        includePromptIds: [...LOCAL_DATE_REQUIRED_PROMPT_IDS]
       });
       const started = performAdaptiveAction(lobby, "local-1", "start_match");
       setSession(started as AdaptiveSession);

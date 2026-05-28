@@ -62,15 +62,16 @@ function normalizePromptFilters(mode, promptFilters) {
   };
 }
 
-function eligiblePromptsForMode(mode, promptFilters = { tags: [], includeSpicy: false }) {
+function eligiblePromptsForMode(mode, promptFilters = { tags: [], includeSpicy: false }, includePromptIds) {
   const audience = MODE_AUDIENCE[mode];
   const levelIds = levelIdsForMode(mode);
+  const requiredIds = new Set(Array.isArray(includePromptIds) ? includePromptIds : []);
   return PROMPTS.filter((prompt) =>
-    prompt.audiences.includes(audience) &&
+    (requiredIds.has(prompt.id) || prompt.audiences.includes(audience)) &&
     levelIds.includes(prompt.level) &&
-    (!prompt.experiences || prompt.experiences.includes(mode)) &&
+    (requiredIds.has(prompt.id) || !prompt.experiences || prompt.experiences.includes(mode)) &&
     (!prompt.isSpicy || promptFilters.includeSpicy) &&
-    (mode !== "date_night" || promptFilters.tags.length === 0 ||
+    (requiredIds.has(prompt.id) || mode !== "date_night" || promptFilters.tags.length === 0 ||
       prompt.tags?.some((tag) => promptFilters.tags.includes(tag)))
   );
 }
@@ -224,13 +225,13 @@ function selectIcebreakerTarget(next, random) {
   return selected;
 }
 
-export function createAdaptiveMatch({ mode, participants, random = Math.random, promptFilters }) {
+export function createAdaptiveMatch({ mode, participants, random = Math.random, promptFilters, includePromptIds }) {
   const normalizedMode = normalizeAdaptiveMode(mode);
   if (!isAdaptiveMode(normalizedMode)) {
     fail("Unknown adaptive experience.");
   }
   const normalizedFilters = normalizePromptFilters(normalizedMode, promptFilters);
-  const eligiblePrompts = eligiblePromptsForMode(normalizedMode, normalizedFilters);
+  const eligiblePrompts = eligiblePromptsForMode(normalizedMode, normalizedFilters, includePromptIds);
   const decksByLevel = Object.fromEntries(levelIdsForMode(normalizedMode).map((levelId) => [
     levelId,
     shuffle(eligiblePrompts

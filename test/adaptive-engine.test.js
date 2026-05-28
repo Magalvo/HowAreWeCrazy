@@ -117,6 +117,24 @@ test("A Table 4 Two custom themes use OR matching and keep spicy prompts opt-in"
   assert.equal(ids.includes("q131"), false);
 });
 
+test("A Table 4 Two can guarantee curated local one-phone prompts despite theme filters", () => {
+  const requiredIds = [
+    "c01", "c08", "c09", "d106", "d108",
+    "n03", "n12", "d210", "q118", "q111",
+    "r07", "r12", "d311", "d315", "q121"
+  ];
+  const match = start("date_night", pair, {
+    promptFilters: { tags: ["Romance"], includeSpicy: false },
+    includePromptIds: requiredIds
+  });
+  const ids = Object.values(match.decksByLevel).flat();
+
+  assert.equal(requiredIds.every((id) => ids.includes(id)), true);
+  assert.equal(match.decksByLevel.curiosity.filter((id) => requiredIds.includes(id)).length, 5);
+  assert.equal(match.decksByLevel.connection.filter((id) => requiredIds.includes(id)).length, 5);
+  assert.equal(match.decksByLevel.reflection.filter((id) => requiredIds.includes(id)).length, 5);
+});
+
 test("A Table 4 Two rejects too-narrow filters and other modes reject custom filters", () => {
   assert.throws(
     () => createAdaptiveMatch({
