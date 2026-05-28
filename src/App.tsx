@@ -58,6 +58,7 @@ const LOCAL_DATE_REQUIRED_PROMPT_IDS = [
   "q121"
 ];
 type I18n = ReturnType<typeof createI18n>;
+type DateVariant = "classic" | "free_minds";
 const I18nContext = createContext<I18n>(createI18n("en"));
 
 function useI18n() {
@@ -166,6 +167,7 @@ export function App() {
   const [cardsPerLevel, setCardsPerLevel] = useState(6);
   const [selectedThemeTags, setSelectedThemeTags] = useState<string[]>([]);
   const [includeSpicy, setIncludeSpicy] = useState(false);
+  const [dateVariant, setDateVariant] = useState<DateVariant>("classic");
   const [agreement, setAgreement] = useState(false);
   const [joinCode, setJoinCode] = useState(invitedCode);
   const [joinName, setJoinName] = useState("");
@@ -365,7 +367,7 @@ export function App() {
     if (playMode === "host") {
       try {
         const dateNightFilters = roomMode === "date_night"
-          ? { promptFilters: { tags: selectedThemeTags, includeSpicy } }
+          ? { promptFilters: { tags: selectedThemeTags, includeSpicy }, dateVariant }
           : {};
         const connection = await requestJson<RoomConnection>("/api/rooms", {
           method: "POST",
@@ -393,6 +395,7 @@ export function App() {
           { id: "local-2", name: secondName, role: "player" }
         ],
         promptFilters: { tags: selectedThemeTags, includeSpicy },
+        dateVariant,
         includePromptIds: [...LOCAL_DATE_REQUIRED_PROMPT_IDS]
       });
       const started = performAdaptiveAction(lobby, "local-1", "start_match");
@@ -597,6 +600,7 @@ export function App() {
             dateNightTags={dateNightTags}
             selectedThemeTags={selectedThemeTags}
             includeSpicy={includeSpicy}
+            dateVariant={dateVariant}
             dateNightCounts={dateNightCounts}
             dateNightFiltersValid={dateNightFiltersValid}
             agreement={agreement}
@@ -612,6 +616,7 @@ export function App() {
             onThemeTag={toggleThemeTag}
             onClearThemeTags={() => setSelectedThemeTags([])}
             onIncludeSpicy={setIncludeSpicy}
+            onDateVariant={setDateVariant}
             onAgreement={setAgreement}
             onJoinCode={setJoinCode}
             onJoinName={setJoinName}
@@ -865,6 +870,7 @@ function SetupScreen(props: {
   dateNightTags: string[];
   selectedThemeTags: string[];
   includeSpicy: boolean;
+  dateVariant: DateVariant;
   dateNightCounts: Record<string, number>;
   dateNightFiltersValid: boolean;
   agreement: boolean;
@@ -880,6 +886,7 @@ function SetupScreen(props: {
   onThemeTag: (value: string) => void;
   onClearThemeTags: () => void;
   onIncludeSpicy: (value: boolean) => void;
+  onDateVariant: (value: DateVariant) => void;
   onAgreement: (value: boolean) => void;
   onJoinCode: (value: string) => void;
   onJoinName: (value: string) => void;
@@ -894,7 +901,9 @@ function SetupScreen(props: {
     props.playMode === "local" && props.roomMode === "date_night";
   const helper = {
     conversation: "Everyone follows one shared deck. No scores, only space to answer or pass.",
-    date_night: "Work together toward a shared milestone, then choose a closing moment.",
+    date_night: props.dateVariant === "free_minds"
+      ? "Milestones unlock rewards, then the questions keep going until the deck is complete."
+      : "Work together toward a shared milestone, then choose a closing moment.",
     inner_circle: "Private draws and points stay playful through balanced target cooldowns.",
     icebreaker: "A fair spin chooses responders while everyone builds group progress."
   }[props.roomMode];
@@ -996,6 +1005,27 @@ function SetupScreen(props: {
                 ))}
               </div>
               <p className="experience-helper">{t(helper)}</p>
+            </fieldset>
+          )}
+          {(props.playMode === "host" || props.playMode === "local") && props.roomMode === "date_night" && (
+            <fieldset className="date-variant-panel">
+              <legend>{t("A Table 4 Two style")}</legend>
+              <div className="rule-grid compact">
+                {([
+                  ["classic", "Shared milestone", "Reach 20 points, choose a closing reward, and end on that moment."],
+                  ["free_minds", "Free Minds", "Unlock rewards at milestones, then keep playing until the questions run out."]
+                ] as const).map(([value, title, copy]) => (
+                  <label className="rule-choice" key={value}>
+                    <input
+                      type="radio"
+                      checked={props.dateVariant === value}
+                      onChange={() => props.onDateVariant(value)}
+                    />
+                    <span className="choice-title">{t(title)}</span>
+                    <span className="choice-copy">{t(copy)}</span>
+                  </label>
+                ))}
+              </div>
             </fieldset>
           )}
           {(props.playMode === "host" || props.playMode === "local") && props.roomMode === "date_night" && (
@@ -1110,7 +1140,7 @@ function AdaptiveRoomScreen({
   onLeave: () => void;
   local?: boolean;
 }) {
-  const { prompt: localizePrompt, t } = useI18n();
+  const { prompt: localizePrompt, reward: localizeReward, t } = useI18n();
   const hasAction = (action: string) => session.availableActions.includes(action);
   const player = (id?: string | null) => session.players.find((item) => item.id === id);
   const active = player(session.activePlayerId);
@@ -1125,6 +1155,14 @@ function AdaptiveRoomScreen({
     session.mode === "inner_circle" && ["preview_card", "replacement_preview"].includes(session.phase)
   );
   const guidance = adaptiveGuidance(session, active, target, hasAction, t);
+  const milestoneAction = hasAction("choose_milestone_reward") ? "choose_milestone_reward" :
+    hasAction("choose_ending") ? "choose_ending" : null;
+  const freeMindsReward = session.mode === "date_night" &&
+    session.dateVariant === "free_minds" &&
+    session.revealedReward &&
+    session.phase !== "choose_milestone_reward"
+    ? session.revealedReward
+    : null;
 
   return (
     <section className="screen points-screen" aria-live="polite">
@@ -1154,10 +1192,16 @@ function AdaptiveRoomScreen({
               <p className="eyebrow">{t("Turn {turn}", { turn: session.turnNumber })}</p>
               <h2>{session.mode === "date_night" ? t("{name} responds", { name: active.name }) : session.mode === "icebreaker" ? t("{name} facilitates", { name: active.name }) : t("{name}'s turn", { name: active.name })}</h2>
             </div>
-            <p className="score-target">{session.mode === "date_night" ? t("Shared milestone") : session.mode === "icebreaker" ? t("Together to 15") : t("First to 21")}</p>
+            <p className="score-target">{session.mode === "date_night" ? t(session.dateVariant === "free_minds" ? "Free Minds" : "Shared milestone") : session.mode === "icebreaker" ? t("Together to 15") : t("First to 21")}</p>
           </div>
           {session.mode !== "inner_circle" ? <SharedMeter session={session} /> : <ScorePanel session={session} />}
           <p className="points-guidance">{guidance}</p>
+          {freeMindsReward && (
+            <article className="reward-card milestone-reward-card">
+              <p className="eyebrow">{t("Latest milestone reward")}</p>
+              <p>{localizeReward(freeMindsReward).text}</p>
+            </article>
+          )}
           {hasAction("choose_level") && (
             <LevelPicker session={session} viewer={player(snapshot.viewerId)} pending={pending} onAction={onAction} />
           )}
@@ -1182,13 +1226,13 @@ function AdaptiveRoomScreen({
               onAction={onAction}
             />
           )}
-          {session.mode === "date_night" && session.phase === "choose_ending" && (
+          {session.mode === "date_night" && milestoneAction && (
             <div className="ending-picker">
-              <p className="eyebrow">{t("Shared milestone reached")}</p>
-              <h3>{t("How would you like to close tonight?")}</h3>
+              <p className="eyebrow">{t(session.dateVariant === "free_minds" ? "Free Minds milestone reached" : "Shared milestone reached")}</p>
+              <h3>{t(session.dateVariant === "free_minds" ? "Choose your milestone reward." : "How would you like to close tonight?")}</h3>
               <div className="ending-actions">
-                <button className="primary-button" disabled={pending || !hasAction("choose_ending")} onClick={() => onAction("choose_ending", { endingType: "activity" })}>{t("Do Something Together")}</button>
-                <button className="secondary-button" disabled={pending || !hasAction("choose_ending")} onClick={() => onAction("choose_ending", { endingType: "question" })}>{t("One More Meaningful Question")}</button>
+                <button className="primary-button" disabled={pending} onClick={() => onAction(milestoneAction, { endingType: "activity" })}>{t("Do Something Together")}</button>
+                <button className="secondary-button" disabled={pending} onClick={() => onAction(milestoneAction, { endingType: "question" })}>{t("One More Meaningful Question")}</button>
               </div>
             </div>
           )}
@@ -1245,6 +1289,7 @@ function AdaptiveLobby({ session, hasAction, pending, onAction }: {
       <p className="lede">{t(copy, copyValues)}</p>
       {session.mode === "date_night" && (
         <div className="lobby-filters">
+          <span>{t("Style: {style}", { style: t(session.dateVariant === "free_minds" ? "Free Minds" : "Shared milestone") })}</span>
           <span>{t("Themes: {themes}", { themes: selectedThemes })}</span>
           <span>{t(session.promptFilters?.includeSpicy ? "Spicy prompts ON" : "Spicy prompts off")}</span>
         </div>
@@ -1258,13 +1303,16 @@ function AdaptiveLobby({ session, hasAction, pending, onAction }: {
 function SharedMeter({ session }: { session: AdaptiveSession }) {
   const { level: localizeLevel, t } = useI18n();
   const score = session.mode === "date_night" ? session.connectionScore || 0 : session.groupScore || 0;
+  const target = session.mode === "date_night" && session.dateVariant === "free_minds"
+    ? session.nextMilestoneScore || session.scoreTarget
+    : session.scoreTarget;
   return (
     <div className="shared-meter">
       <div className="meter-copy">
         <span>{session.mode === "date_night" ? t("Connection Meter") : t("Group progress")}</span>
-        <strong>{score} / {session.scoreTarget}</strong>
+        <strong>{score} / {target}</strong>
       </div>
-      <div className="meter-track" aria-hidden="true"><span style={{ width: `${Math.min(100, (score / session.scoreTarget) * 100)}%` }} /></div>
+      <div className="meter-track" aria-hidden="true"><span style={{ width: `${Math.min(100, (score / target) * 100)}%` }} /></div>
       {session.mode === "date_night" && (
         <div className="level-progress">
           {levels.map((level) => <span key={level.id}>{localizeLevel(level).name}: {session.completedByLevel?.[level.id] || 0} / 2</span>)}
@@ -1469,6 +1517,7 @@ function adaptiveGuidance(
   t: I18n["t"]
 ) {
   if (session.mode === "date_night") {
+    if (session.phase === "choose_milestone_reward") return t("Milestone reached. Choose a shared reward, then keep going.");
     if (session.phase === "choose_ending") return t("You reached your shared milestone. Either partner can choose how to close tonight.");
     if (session.phase === "choose_level") return hasAction("choose_level") ? t("Your turn to answer. Choose a depth that feels right.") : t("{name} is choosing a prompt to answer.", { name: active?.name || "" });
     return hasAction("complete") ? t("Share what feels true, then mark Completed. Passing is always welcome.") : t("{name} is answering this prompt.", { name: active?.name || "" });

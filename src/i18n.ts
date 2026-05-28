@@ -52,6 +52,8 @@ const UI_PT: Record<string, string> = {
     "Todos seguem o mesmo baralho. Sem pontuações, só espaço para responder ou passar.",
   "Work together toward a shared milestone, then choose a closing moment.":
     "Trabalhem em conjunto até um marco partilhado e escolham um momento final.",
+  "Milestones unlock rewards, then the questions keep going until the deck is complete.":
+    "Os marcos desbloqueiam recompensas e as perguntas continuam até o baralho acabar.",
   "Private draws and points stay playful through balanced target cooldowns.":
     "As cartas privadas e os pontos mantêm-se leves com protecção de escolha equilibrada.",
   "A fair spin chooses responders while everyone builds group progress.":
@@ -66,6 +68,12 @@ const UI_PT: Record<string, string> = {
   "Available prompts by level": "Perguntas disponíveis por nível",
   "All themes selected.": "Todos os temas seleccionados.",
   "Selected: {themes}.": "Seleccionados: {themes}.",
+  "A Table 4 Two style": "Estilo A Table 4 Two",
+  "Reach 20 points, choose a closing reward, and end on that moment.":
+    "Cheguem aos 20 pontos, escolham uma recompensa final e terminem nesse momento.",
+  "Free Minds": "Mentes Livres",
+  "Unlock rewards at milestones, then keep playing until the questions run out.":
+    "Desbloqueiem recompensas nos marcos e continuem a jogar até as perguntas acabarem.",
   "Choose broader themes. A Table 4 Two needs at least 2 prompts in every level.":
     "Escolhe temas mais abrangentes. A Table 4 Two precisa de pelo menos 2 perguntas em cada nível.",
   "Cards per level": "Cartas por nível",
@@ -90,6 +98,7 @@ const UI_PT: Record<string, string> = {
     "As duas pessoas já estão aqui. Quem criou a sala pode começar quando fizer sentido.",
   "Start A Table 4 Two": "Começar A Table 4 Two",
   Scoreboard: "Pontuações",
+  "Style: {style}": "Estilo: {style}",
   Turn: "Turno",
   "Bailout used": "Saída segura usada",
   "Double Down used": "Aposta dobrada usada",
@@ -138,6 +147,9 @@ const UI_PT: Record<string, string> = {
   "Prompts are spread around the group. Cooling down players return in the next cycle.":
     "As perguntas são distribuídas pelo grupo. Pessoas em pausa voltam no próximo ciclo.",
   "Cooling down": "Em pausa",
+  "Free Minds milestone reached": "Marco Mentes Livres alcançado",
+  "Choose your milestone reward.": "Escolham a vossa recompensa de marco.",
+  "Latest milestone reward": "Última recompensa de marco",
   "Shared milestone reached": "Marco partilhado alcançado",
   "How would you like to close tonight?": "Como querem fechar esta noite?",
   "Do Something Together": "Fazer algo juntos",
@@ -207,6 +219,8 @@ const UI_PT: Record<string, string> = {
     "Alcançaram o vosso marco partilhado. Qualquer um pode escolher como fechar a noite.",
   "You are facilitating. Pick a friendly depth for the group.": "Estás a facilitar. Escolhe uma profundidade acolhedora para o grupo.",
   "{name} is selecting a prompt level.": "{name} está a escolher um nível.",
+  "Milestone reached. Choose a shared reward, then keep going.":
+    "Marco alcançado. Escolham uma recompensa partilhada e continuem.",
   "The prompt is ready. Spin to fairly choose its responder.":
     "A pergunta está pronta. Gira para escolher justamente quem responde.",
   "{name} is spinning for a responder.": "{name} está a sortear quem responde.",

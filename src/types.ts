@@ -60,6 +60,7 @@ export interface Challenge {
 
 export interface AdaptiveSession {
   mode: AdaptiveMode;
+  dateVariant?: "classic" | "free_minds";
   status: "lobby" | "playing" | "finished";
   phase: string;
   players: AdaptivePlayer[];
@@ -74,12 +75,14 @@ export interface AdaptiveSession {
   targetablePlayerIds?: string[];
   promptFilters?: PromptFilters;
   connectionScore?: number;
+  nextMilestoneScore?: number;
   groupScore?: number;
   completedByLevel?: Record<string, number>;
   winnerIds?: string[];
   endReason?: string;
   endingChoice?: "activity" | "question";
-  revealedReward?: { id: string; text: string };
+  revealedReward?: { id: string; text: string; type?: "activity" | "question" };
+  milestoneRewards?: Array<{ id: string; text: string; type?: "activity" | "question" }>;
 }
 
 export interface Participant {

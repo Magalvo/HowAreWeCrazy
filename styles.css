@@ -392,6 +392,17 @@ small {
   padding: 11px 13px;
 }
 
+.date-variant-panel {
+  background: color-mix(in srgb, var(--surface-strong) 86%, var(--accent-soft));
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 17px;
+}
+
+.rule-grid.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .theme-panel {
   background: var(--surface-strong);
   border: 1px solid var(--border);
@@ -1220,6 +1231,10 @@ small {
   margin-bottom: 20px;
 }
 
+.milestone-reward-card {
+  border-color: var(--accent);
+}
+
 .reward-card > p:not(.eyebrow) {
   font-family: Georgia, "Times New Roman", serif;
   font-size: 1.35rem;
@@ -1595,6 +1610,10 @@ small {
   }
 
   .choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rule-grid.compact {
     grid-template-columns: 1fr;
   }
 

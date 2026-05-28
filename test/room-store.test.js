@@ -114,10 +114,12 @@ test("A Table 4 Two room creation accepts and exposes safe custom theme filters"
   const created = store.createRoom({
     mode: "date_night",
     hostName: "Ari",
-    promptFilters: { tags: ["Future", "Romance"], includeSpicy: true }
+    promptFilters: { tags: ["Future", "Romance"], includeSpicy: true },
+    dateVariant: "free_minds"
   });
 
   assert.deepEqual(created.room.session.promptFilters, { tags: ["Future", "Romance"], includeSpicy: true });
+  assert.equal(created.room.session.dateVariant, "free_minds");
   assert.equal(created.room.session.usedPromptIds, undefined);
 });
 

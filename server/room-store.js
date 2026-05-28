@@ -104,7 +104,8 @@ export function createRoomStore({
     cardsPerLevel = 6,
     hostName = "",
     mode = "conversation",
-    promptFilters
+    promptFilters,
+    dateVariant
   }) {
     const normalizedMode = normalizeAdaptiveMode(mode);
     if (normalizedMode !== "conversation" && !isAdaptiveMode(normalizedMode)) {
@@ -137,7 +138,7 @@ export function createRoomStore({
         mode: normalizedMode,
         hostToken,
         members: [{ id: host.id, participantToken }],
-        session: createAdaptiveMatch({ mode: normalizedMode, participants: [host], random, promptFilters }),
+        session: createAdaptiveMatch({ mode: normalizedMode, participants: [host], random, promptFilters, dateVariant }),
         createdAt: now(),
         listeners: new Set(),
         disconnectTimers: new Map(),

@@ -62,6 +62,13 @@ function normalizePromptFilters(mode, promptFilters) {
   };
 }
 
+function normalizeDateVariant(mode, dateVariant) {
+  if (mode !== "date_night") {
+    return null;
+  }
+  return dateVariant === "free_minds" ? "free_minds" : "classic";
+}
+
 function eligiblePromptsForMode(mode, promptFilters = { tags: [], includeSpicy: false }, includePromptIds) {
   const audience = MODE_AUDIENCE[mode];
   const levelIds = levelIdsForMode(mode);
@@ -190,8 +197,25 @@ function finishInnerForTarget(next) {
 }
 
 function dateMilestoneMet(match) {
-  return match.connectionScore >= match.scoreTarget &&
+  const milestoneTarget = match.dateVariant === "free_minds"
+    ? match.nextMilestoneScore || match.scoreTarget
+    : match.scoreTarget;
+  return match.connectionScore >= milestoneTarget &&
     levelIdsForMode(match.mode).every((levelId) => match.completedByLevel[levelId] >= 2);
+}
+
+function chooseDateReward(next, endingType, random) {
+  if (!["activity", "question"].includes(endingType)) {
+    fail("Choose a supported ending.");
+  }
+  const rewards = endingType === "activity" ? DATE_ACTIVITY_REWARDS : DATE_QUESTION_REWARDS;
+  const reward = copy(shuffle(rewards, random)[0]);
+  next.endingChoice = endingType;
+  next.revealedReward = reward;
+  if (Array.isArray(next.milestoneRewards)) {
+    next.milestoneRewards.push({ ...reward, type: endingType });
+  }
+  return reward;
 }
 
 function connectedAlternativeIds(match) {
@@ -225,12 +249,20 @@ function selectIcebreakerTarget(next, random) {
   return selected;
 }
 
-export function createAdaptiveMatch({ mode, participants, random = Math.random, promptFilters, includePromptIds }) {
+export function createAdaptiveMatch({
+  mode,
+  participants,
+  random = Math.random,
+  promptFilters,
+  includePromptIds,
+  dateVariant
+}) {
   const normalizedMode = normalizeAdaptiveMode(mode);
   if (!isAdaptiveMode(normalizedMode)) {
     fail("Unknown adaptive experience.");
   }
   const normalizedFilters = normalizePromptFilters(normalizedMode, promptFilters);
+  const normalizedDateVariant = normalizeDateVariant(normalizedMode, dateVariant);
   const eligiblePrompts = eligiblePromptsForMode(normalizedMode, normalizedFilters, includePromptIds);
   const decksByLevel = Object.fromEntries(levelIdsForMode(normalizedMode).map((levelId) => [
     levelId,
@@ -267,11 +299,14 @@ export function createAdaptiveMatch({ mode, participants, random = Math.random, 
     endReason: null,
     ...(normalizedMode === "date_night"
       ? {
+          dateVariant: normalizedDateVariant,
           promptFilters: normalizedFilters,
           connectionScore: 0,
+          nextMilestoneScore: 20,
           completedByLevel: { curiosity: 0, connection: 0, reflection: 0 },
           endingChoice: null,
-          revealedReward: null
+          revealedReward: null,
+          milestoneRewards: []
         }
       : {}),
     ...(normalizedMode === "inner_circle" ? { winnerIds: [], cooldownTargetIds: [] } : {}),
@@ -362,7 +397,7 @@ function resolveDateAction(next, actorId, action) {
       next.completedByLevel[next.currentChallenge.levelId] += 1;
       if (dateMilestoneMet(next)) {
         clearChallenge(next);
-        next.phase = "choose_ending";
+        next.phase = next.dateVariant === "free_minds" ? "choose_milestone_reward" : "choose_ending";
         return;
       }
     } else {
@@ -545,17 +580,22 @@ export function performAdaptiveAction(match, actorId, action, payload = {}, rand
     return next;
   }
   if (next.mode === "date_night") {
+    if (action === "choose_milestone_reward") {
+      requirePlaying(next);
+      if (next.dateVariant !== "free_minds" || next.phase !== "choose_milestone_reward") {
+        fail("There is no milestone reward to choose right now.");
+      }
+      chooseDateReward(next, payload.endingType, random);
+      next.nextMilestoneScore = (next.nextMilestoneScore || next.scoreTarget) + next.scoreTarget;
+      rotateOrExhaust(next);
+      return next;
+    }
     if (action === "choose_ending") {
       requirePlaying(next);
       if (next.phase !== "choose_ending") {
         fail("There is no ending to choose right now.");
       }
-      if (!["activity", "question"].includes(payload.endingType)) {
-        fail("Choose a supported ending.");
-      }
-      const rewards = payload.endingType === "activity" ? DATE_ACTIVITY_REWARDS : DATE_QUESTION_REWARDS;
-      next.endingChoice = payload.endingType;
-      next.revealedReward = copy(shuffle(rewards, random)[0]);
+      chooseDateReward(next, payload.endingType, random);
       next.status = "finished";
       next.phase = "finished";
       next.endReason = "milestone";
@@ -595,6 +635,7 @@ function actionsFor(match, viewerId, canSkip) {
     if (match.phase === "choose_level" && viewerId === match.activePlayerId) actions.push("choose_level");
     if (match.phase === "await_response" && viewerId === match.currentResponderId) actions.push("complete", "pass");
     if (match.phase === "choose_ending") actions.push("choose_ending");
+    if (match.phase === "choose_milestone_reward") actions.push("choose_milestone_reward");
     return actions;
   }
   if (match.mode === "icebreaker") {

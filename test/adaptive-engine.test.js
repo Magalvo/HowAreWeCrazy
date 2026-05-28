@@ -72,6 +72,27 @@ test("A Table 4 Two requires depth variety before its shared ending and makes re
   assert.match(questionMatch.revealedReward.id, /^question-/);
 });
 
+test("A Table 4 Two Free Minds turns the shared ending into continuing milestones", () => {
+  let match = start("date_night", pair, { dateVariant: "free_minds" });
+  match.connectionScore = 20;
+  match.completedByLevel = { curiosity: 2, connection: 2, reflection: 1 };
+  match = performAdaptiveAction(match, "host", "choose_level", { levelId: "reflection" });
+  match = performAdaptiveAction(match, "host", "complete");
+
+  assert.equal(match.status, "playing");
+  assert.equal(match.phase, "choose_milestone_reward");
+  assert.ok(adaptiveView(match, "p2").availableActions.includes("choose_milestone_reward"));
+
+  match = performAdaptiveAction(match, "p2", "choose_milestone_reward", { endingType: "question" }, () => 0);
+  assert.equal(match.status, "playing");
+  assert.equal(match.phase, "choose_level");
+  assert.equal(match.activePlayerId, "p2");
+  assert.equal(match.nextMilestoneScore, 40);
+  assert.equal(match.endReason, null);
+  assert.match(match.revealedReward.id, /^question-/);
+  assert.equal(match.milestoneRewards.length, 1);
+});
+
 test("A Table 4 Two passing rotates safely without adding shared points", () => {
   let match = start("date_night", pair);
   match = performAdaptiveAction(match, "host", "choose_level", { levelId: "curiosity" });
