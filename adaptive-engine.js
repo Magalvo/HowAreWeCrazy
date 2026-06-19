@@ -1,4 +1,5 @@
 import { DATE_ACTIVITY_REWARDS, DATE_QUESTION_REWARDS } from "./data/date-rewards.js";
+import { CLASSIC_ARON_PROMPT_IDS, CLASSIC_BONUS_PROMPT_IDS } from "./data/classic-prompts.js";
 import { LEVELS, PROMPTS, promptById } from "./data/prompts.js";
 
 export const LEVEL_POINTS = {
@@ -7,9 +8,10 @@ export const LEVEL_POINTS = {
   reflection: 5
 };
 
-export const ADAPTIVE_MODES = ["date_night", "inner_circle", "icebreaker"];
+export const ADAPTIVE_MODES = ["classic", "date_night", "inner_circle", "icebreaker"];
 
 const MODE_AUDIENCE = {
+  classic: "couple",
   date_night: "couple",
   inner_circle: "friends",
   icebreaker: "group"
@@ -41,6 +43,7 @@ export function isAdaptiveMode(mode) {
 }
 
 function levelIdsForMode(mode) {
+  if (mode === "classic") return ["aron", "bonus"];
   return mode === "icebreaker" ? ["curiosity", "connection"] : LEVELS.map((level) => level.id);
 }
 
@@ -132,6 +135,27 @@ function takePrompt(next, levelId) {
   };
 }
 
+function takeClassicPrompt(next, stage) {
+  const promptId = next.decksByLevel[stage]?.shift();
+  if (!promptId) {
+    return false;
+  }
+  const prompt = promptById(promptId);
+  next.usedPromptIds.push(promptId);
+  next.currentChallenge = {
+    levelId: prompt?.level || stage,
+    basePoints: 0,
+    promptId,
+    doubled: false,
+    excludedTargetId: null,
+    claimant: false
+  };
+  next.classicStage = stage;
+  next.classicIndex += 1;
+  next.phase = "classic_prompt";
+  return true;
+}
+
 function allDecksEmpty(match) {
   return levelIdsForMode(match.mode).every((levelId) => match.decksByLevel[levelId].length === 0);
 }
@@ -148,6 +172,14 @@ function rotate(next) {
   next.currentResponderId = next.mode === "date_night" ? next.activePlayerId : null;
   next.turnNumber += 1;
   next.phase = "choose_level";
+}
+
+function finishClassic(next, reason) {
+  next.status = "finished";
+  next.phase = "finished";
+  next.classicStage = "finished";
+  next.endReason = reason;
+  clearChallenge(next);
 }
 
 function finishGentle(next) {
@@ -249,13 +281,23 @@ function selectIcebreakerTarget(next, random) {
   return selected;
 }
 
+/**
+ * @param {{
+ *   mode: string,
+ *   participants: Array<any>,
+ *   random?: () => number,
+ *   promptFilters?: any,
+ *   includePromptIds?: string[],
+ *   dateVariant?: string
+ * }} options
+ */
 export function createAdaptiveMatch({
   mode,
   participants,
   random = Math.random,
-  promptFilters,
-  includePromptIds,
-  dateVariant
+  promptFilters = undefined,
+  includePromptIds = undefined,
+  dateVariant = undefined
 }) {
   const normalizedMode = normalizeAdaptiveMode(mode);
   if (!isAdaptiveMode(normalizedMode)) {
@@ -263,13 +305,17 @@ export function createAdaptiveMatch({
   }
   const normalizedFilters = normalizePromptFilters(normalizedMode, promptFilters);
   const normalizedDateVariant = normalizeDateVariant(normalizedMode, dateVariant);
-  const eligiblePrompts = eligiblePromptsForMode(normalizedMode, normalizedFilters, includePromptIds);
-  const decksByLevel = Object.fromEntries(levelIdsForMode(normalizedMode).map((levelId) => [
-    levelId,
-    shuffle(eligiblePrompts
-      .filter((prompt) => prompt.level === levelId)
-      .map((prompt) => prompt.id), random)
-  ]));
+  const eligiblePrompts = normalizedMode === "classic"
+    ? []
+    : eligiblePromptsForMode(normalizedMode, normalizedFilters, includePromptIds);
+  const decksByLevel = normalizedMode === "classic"
+    ? { aron: [...CLASSIC_ARON_PROMPT_IDS], bonus: [...CLASSIC_BONUS_PROMPT_IDS] }
+    : Object.fromEntries(levelIdsForMode(normalizedMode).map((levelId) => [
+      levelId,
+      shuffle(eligiblePrompts
+        .filter((prompt) => prompt.level === levelId)
+        .map((prompt) => prompt.id), random)
+    ]));
   if (normalizedMode === "date_night" &&
     Object.values(decksByLevel).some((deck) => deck.length < 2)) {
     fail("Choose more themes; A Table 4 Two needs at least 2 prompts in every level.");
@@ -291,7 +337,7 @@ export function createAdaptiveMatch({
     targetPlayerId: null,
     currentResponderId: null,
     turnNumber: 0,
-    scoreTarget: normalizedMode === "date_night" ? 20 : normalizedMode === "icebreaker" ? 15 : 21,
+    scoreTarget: normalizedMode === "classic" ? 0 : normalizedMode === "date_night" ? 20 : normalizedMode === "icebreaker" ? 15 : 21,
     decksByLevel,
     usedPromptIds: [],
     discardedPromptIds: [],
@@ -309,6 +355,14 @@ export function createAdaptiveMatch({
           milestoneRewards: []
         }
       : {}),
+    ...(normalizedMode === "classic"
+      ? {
+          classicStage: "aron",
+          classicIndex: 0,
+          classicBonusOffered: false,
+          classicCompletedAron: false
+        }
+      : {}),
     ...(normalizedMode === "inner_circle" ? { winnerIds: [], cooldownTargetIds: [] } : {}),
     ...(normalizedMode === "icebreaker" ? { groupScore: 0, rouletteCycleTargetIds: [] } : {})
   };
@@ -318,7 +372,7 @@ export function addAdaptiveLobbyPlayer(match, participant) {
   if (match.status !== "lobby") {
     fail("This experience has already started.");
   }
-  const maxPlayers = match.mode === "date_night" ? 2 : 6;
+  const maxPlayers = ["classic", "date_night"].includes(match.mode) ? 2 : 6;
   if (match.players.length >= maxPlayers) {
     fail("This experience room is full.");
   }
@@ -346,17 +400,23 @@ function startExperience(next, actorId) {
   if (next.status !== "lobby") {
     fail("This experience has already started.");
   }
-  if (next.mode === "date_night" && next.players.length !== 2) {
-    fail("A Table 4 Two starts with exactly two participants.");
+  if (["classic", "date_night"].includes(next.mode) && next.players.length !== 2) {
+    fail(next.mode === "classic"
+      ? "Classic starts with exactly two participants."
+      : "A Table 4 Two starts with exactly two participants.");
   }
-  if (next.mode !== "date_night" && (next.players.length < 3 || next.players.length > 6)) {
+  if (!["classic", "date_night"].includes(next.mode) && (next.players.length < 3 || next.players.length > 6)) {
     fail("This experience starts with 3 to 6 participants.");
   }
   next.status = "playing";
-  next.phase = "choose_level";
   next.activePlayerId = next.turnOrder[0];
   next.currentResponderId = next.mode === "date_night" ? next.activePlayerId : null;
   next.turnNumber = 1;
+  if (next.mode === "classic") {
+    takeClassicPrompt(next, "aron");
+    return;
+  }
+  next.phase = "choose_level";
 }
 
 function chooseLevel(next, actorId, payload) {
@@ -407,6 +467,54 @@ function resolveDateAction(next, actorId, action) {
     return;
   }
   fail("That action is unavailable in A Table 4 Two.");
+}
+
+function resolveClassicAction(next, action) {
+  requirePlaying(next);
+  if (action === "next_prompt" || action === "pass") {
+    if (next.phase !== "classic_prompt") {
+      fail("There is no Classic prompt to advance right now.");
+    }
+    if (action === "pass") {
+      discardChallenge(next);
+    }
+    clearChallenge(next);
+    if (next.classicStage === "aron") {
+      if (takeClassicPrompt(next, "aron")) {
+        next.turnNumber += 1;
+        return;
+      }
+      next.classicCompletedAron = true;
+      next.classicBonusOffered = true;
+      next.phase = "classic_bonus_choice";
+      return;
+    }
+    if (takeClassicPrompt(next, "bonus")) {
+      next.turnNumber += 1;
+      return;
+    }
+    finishClassic(next, "classic_complete");
+    return;
+  }
+  if (action === "continue_bonus") {
+    if (next.phase !== "classic_bonus_choice" || !next.classicCompletedAron) {
+      fail("There is no Classic bonus deck to continue right now.");
+    }
+    next.classicStage = "bonus";
+    next.classicIndex = 0;
+    if (!takeClassicPrompt(next, "bonus")) {
+      finishClassic(next, "classic_complete");
+    }
+    return;
+  }
+  if (action === "end_classic") {
+    if (!["classic_prompt", "classic_bonus_choice"].includes(next.phase)) {
+      fail("Classic cannot be ended right now.");
+    }
+    finishClassic(next, next.classicCompletedAron ? "classic_arons_complete" : "classic_ended");
+    return;
+  }
+  fail("That action is unavailable in Classic.");
 }
 
 function resolveInnerAction(next, actorId, action, payload) {
@@ -579,6 +687,10 @@ export function performAdaptiveAction(match, actorId, action, payload = {}, rand
     skipStalledTurn(next, actorId, payload);
     return next;
   }
+  if (next.mode === "classic") {
+    resolveClassicAction(next, action);
+    return next;
+  }
   if (next.mode === "date_night") {
     if (action === "choose_milestone_reward") {
       requirePlaying(next);
@@ -619,7 +731,9 @@ function actionsFor(match, viewerId, canSkip) {
   }
   const actions = [];
   if (match.status === "lobby" && actor.role === "host") {
-    const mayStart = match.mode === "date_night" ? match.players.length === 2 : match.players.length >= 3;
+    const mayStart = ["classic", "date_night"].includes(match.mode)
+      ? match.players.length === 2
+      : match.players.length >= 3;
     if (mayStart) {
       actions.push("start_match");
     }
@@ -636,6 +750,11 @@ function actionsFor(match, viewerId, canSkip) {
     if (match.phase === "await_response" && viewerId === match.currentResponderId) actions.push("complete", "pass");
     if (match.phase === "choose_ending") actions.push("choose_ending");
     if (match.phase === "choose_milestone_reward") actions.push("choose_milestone_reward");
+    return actions;
+  }
+  if (match.mode === "classic") {
+    if (match.phase === "classic_prompt") actions.push("next_prompt", "pass", "end_classic");
+    if (match.phase === "classic_bonus_choice") actions.push("continue_bonus", "end_classic");
     return actions;
   }
   if (match.mode === "icebreaker") {
@@ -662,6 +781,7 @@ function actionsFor(match, viewerId, canSkip) {
 
 function promptIsVisible(match, viewerId) {
   if (!match.currentChallenge) return false;
+  if (match.mode === "classic") return match.phase === "classic_prompt";
   if (match.mode === "date_night") return match.phase === "await_response";
   if (match.mode === "icebreaker") return match.phase === "await_response";
   return ["await_response", "await_claim"].includes(match.phase) ||

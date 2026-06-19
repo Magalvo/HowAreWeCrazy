@@ -1,11 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   adaptiveView,
   createAdaptiveMatch,
   performAdaptiveAction
 } from "../adaptive-engine.js";
-import { promptById } from "../data/prompts.js";
+import { CLASSIC_ARON_PROMPT_IDS, CLASSIC_BONUS_PROMPT_IDS } from "../data/classic-prompts.js";
+import { PROMPTS, promptById } from "../data/prompts.js";
 
 const pair = [
   { id: "host", name: "Host", role: "host" },
@@ -36,6 +38,74 @@ test("supplied tagged prompts are mapped with safe metadata", () => {
   }
   assert.equal(promptById("q131").audiences.includes("couple"), false);
   assert.equal(promptById("q135").audiences.includes("couple"), false);
+});
+
+test("Classic prompt pack has ordered Aron prompts, original bonus prompts, and Portuguese coverage", () => {
+  const i18nSource = readFileSync(new URL("../src/i18n.ts", import.meta.url), "utf8");
+  assert.equal(CLASSIC_ARON_PROMPT_IDS.length, 36);
+  assert.equal(CLASSIC_BONUS_PROMPT_IDS.length, 72);
+  assert.equal(CLASSIC_ARON_PROMPT_IDS[0], "aron01");
+  assert.equal(CLASSIC_ARON_PROMPT_IDS[35], "aron36");
+  assert.equal(promptById("aron01").text, "Given the choice of anyone in the world, whom would you want as a dinner guest?");
+  assert.equal(promptById("aron36").text.startsWith("Share a personal problem"), true);
+
+  for (const id of [...CLASSIC_ARON_PROMPT_IDS, ...CLASSIC_BONUS_PROMPT_IDS]) {
+    assert.ok(promptById(id), `${id} should exist`);
+    assert.ok(i18nSource.includes(`${id}:`), `${id} should have Portuguese copy`);
+  }
+
+  const bonusText = CLASSIC_BONUS_PROMPT_IDS.map((id) => promptById(id).text);
+  assert.equal(bonusText.some((text) => text.includes("What is the first thing you noticed about me?")), false);
+  assert.equal(bonusText.some((text) => text.includes("What reality show do you think")), false);
+  assert.equal(PROMPTS.filter((prompt) => prompt.experiences?.includes("classic")).length, 108);
+});
+
+test("Classic requires two players, starts at aron01, and offers a bonus deck after the 36", () => {
+  const solo = createAdaptiveMatch({ mode: "classic", participants: [pair[0]], random: () => 0.2 });
+  assert.throws(() => performAdaptiveAction(solo, "host", "start_match"), /exactly two/);
+
+  let match = start("classic", pair);
+  assert.equal(match.phase, "classic_prompt");
+  assert.equal(match.classicStage, "aron");
+  assert.equal(match.classicIndex, 1);
+  assert.equal(match.currentChallenge.promptId, "aron01");
+  assert.ok(adaptiveView(match, "p2").currentChallenge.prompt.text);
+
+  match = performAdaptiveAction(match, "p2", "next_prompt");
+  assert.equal(match.currentChallenge.promptId, "aron02");
+  match = performAdaptiveAction(match, "host", "pass");
+  assert.equal(match.currentChallenge.promptId, "aron03");
+  assert.ok(match.discardedPromptIds.includes("aron02"));
+
+  while (match.phase === "classic_prompt" && match.classicStage === "aron") {
+    match = performAdaptiveAction(match, "host", "next_prompt");
+  }
+
+  assert.equal(match.phase, "classic_bonus_choice");
+  assert.equal(match.classicCompletedAron, true);
+  assert.ok(adaptiveView(match, "p2").availableActions.includes("continue_bonus"));
+
+  const ended = performAdaptiveAction(match, "p2", "end_classic");
+  assert.equal(ended.status, "finished");
+  assert.equal(ended.endReason, "classic_arons_complete");
+});
+
+test("Classic bonus deck continues at classic01 and finishes when exhausted", () => {
+  let match = start("classic", pair);
+  while (match.phase === "classic_prompt" && match.classicStage === "aron") {
+    match = performAdaptiveAction(match, "host", "next_prompt");
+  }
+  match = performAdaptiveAction(match, "p2", "continue_bonus");
+  assert.equal(match.phase, "classic_prompt");
+  assert.equal(match.classicStage, "bonus");
+  assert.equal(match.currentChallenge.promptId, "classic01");
+
+  while (match.status === "playing") {
+    match = performAdaptiveAction(match, "host", "next_prompt");
+  }
+
+  assert.equal(match.status, "finished");
+  assert.equal(match.endReason, "classic_complete");
 });
 
 test("A Table 4 Two requires two players and reveals responder-selected prompts publicly", () => {

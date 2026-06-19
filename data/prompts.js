@@ -1,3 +1,5 @@
+import { CLASSIC_PROMPTS } from "./classic-prompts.js";
+
 export const LEVELS = [
   {
     id: "curiosity",
@@ -112,7 +114,8 @@ export const PROMPTS = [
   { id: "q132", level: "reflection", audiences: ["couple", "friends"], isSpicy: true, tags: ["Romance"], text: "What is the most chaotic, selfish, or petty reason you've ever ended a relationship or friendship?" },
   { id: "q133", level: "reflection", audiences: ["friends", "group"], isSpicy: true, tags: ["Social"], text: "What is a 'secret' you swore to keep for a friend that you eventually ended up telling someone else?" },
   { id: "q134", level: "reflection", audiences: ["couple", "friends"], isSpicy: true, tags: ["Romance"], text: "Have you ever actively self-sabotaged a good relationship or situation because you felt you didn't deserve it?" },
-  { id: "q135", level: "reflection", audiences: ["friends", "group"], isSpicy: true, tags: ["Social"], text: "What is a judgment you made about someone in this room when you first met them, that you now know is false?" }
+  { id: "q135", level: "reflection", audiences: ["friends", "group"], isSpicy: true, tags: ["Social"], text: "What is a judgment you made about someone in this room when you first met them, that you now know is false?" },
+  ...CLASSIC_PROMPTS
 ];
 
 export function promptById(id) {

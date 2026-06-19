@@ -36,7 +36,7 @@ const SESSION_KEY = "open-thread.session";
 const ROOM_KEY = "open-thread.room";
 const SAVED_KEY = "open-thread.saved";
 const LANGUAGE_KEY = "open-thread.language";
-const ADAPTIVE_MODES = ["date_night", "inner_circle", "icebreaker", "competitive"];
+const ADAPTIVE_MODES = ["classic", "date_night", "inner_circle", "icebreaker", "competitive"];
 const levels = LEVELS as Level[];
 const prompts = PROMPTS as Prompt[];
 const points = LEVEL_POINTS as Record<string, number>;
@@ -112,6 +112,7 @@ function normalizeExperience(mode?: string): RoomMode {
 
 function experienceLabel(mode?: string): string {
   return {
+    classic: "Classic",
     date_night: "A Table 4 Two",
     inner_circle: "Inner Circle",
     competitive: "Inner Circle",
@@ -327,7 +328,7 @@ export function App() {
 
   function choosePlayMode(nextMode: PlayMode) {
     setPlayMode(nextMode);
-    if (nextMode === "local" && !["conversation", "date_night"].includes(roomMode)) {
+    if (nextMode === "local" && !["conversation", "classic", "date_night"].includes(roomMode)) {
       setRoomMode("conversation");
     }
   }
@@ -386,6 +387,20 @@ export function App() {
       return;
     }
     leaveRoom();
+    if (roomMode === "classic") {
+      const [firstName, secondName] = pairNames(playerNames);
+      const lobby = createAdaptiveMatch({
+        mode: "classic",
+        participants: [
+          { id: "local-1", name: firstName, role: "host" },
+          { id: "local-2", name: secondName, role: "player" }
+        ]
+      });
+      const started = performAdaptiveAction(lobby, "local-1", "start_match");
+      setSession(started as AdaptiveSession);
+      setScreen("adaptive");
+      return;
+    }
     if (roomMode === "date_night") {
       const [firstName, secondName] = pairNames(playerNames);
       const lobby = createAdaptiveMatch({
@@ -898,9 +913,10 @@ function SetupScreen(props: {
 }) {
   const { t, tag } = useI18n();
   const adaptive = props.playMode === "host" && props.roomMode !== "conversation" ||
-    props.playMode === "local" && props.roomMode === "date_night";
+    props.playMode === "local" && ["classic", "date_night"].includes(props.roomMode);
   const helper = {
     conversation: "Everyone follows one shared deck. No scores, only space to answer or pass.",
+    classic: "The 36 questions, then an optional deeper bonus set.",
     date_night: props.dateVariant === "free_minds"
       ? "Milestones unlock rewards, then the questions keep going until the deck is complete."
       : "Work together toward a shared milestone, then choose a closing moment.",
@@ -973,6 +989,7 @@ function SetupScreen(props: {
               <div className="rule-grid">
                 {([
                   ["conversation", "Unscored", "Conversation", "A gentle shared deck for open conversation."],
+                  ["classic", "2 players | Guided", "Classic", "The 36 questions, then an optional deeper bonus set."],
                   ["date_night", "2 players | Shared goal", "A Table 4 Two", "Build a connection milestone together."]
                 ] as const).map(([value, meta, title, copy]) => (
                   <label className="rule-choice" key={value}>
@@ -992,6 +1009,7 @@ function SetupScreen(props: {
               <div className="rule-grid">
                 {([
                   ["conversation", "Any group | Unscored", "Conversation", "A gentle shared deck for open conversation."],
+                  ["classic", "2 players | Guided", "Classic", "The 36 questions, then an optional deeper bonus set."],
                   ["date_night", "2 players | Shared goal", "A Table 4 Two", "Build a connection milestone together."],
                   ["inner_circle", "3-6 friends | Points", "Inner Circle", "Playfully compete with balanced targeting."],
                   ["icebreaker", "3-6 players | Shared goal", "Icebreaker", "Meet the room through fair roulette."]
@@ -1146,7 +1164,7 @@ function AdaptiveRoomScreen({
   const active = player(session.activePlayerId);
   const target = player(session.targetPlayerId);
   const challenge = session.currentChallenge;
-  const publicPrompt = session.mode === "inner_circle"
+  const publicPrompt = session.mode === "classic" ? session.phase === "classic_prompt" : session.mode === "inner_circle"
     ? ["await_response", "await_claim"].includes(session.phase)
     : session.phase === "await_response";
   const prompt = challenge?.prompt ? localizePrompt(challenge.prompt) : undefined;
@@ -1190,11 +1208,11 @@ function AdaptiveRoomScreen({
           <div className="points-status">
             <div>
               <p className="eyebrow">{t("Turn {turn}", { turn: session.turnNumber })}</p>
-              <h2>{session.mode === "date_night" ? t("{name} responds", { name: active.name }) : session.mode === "icebreaker" ? t("{name} facilitates", { name: active.name }) : t("{name}'s turn", { name: active.name })}</h2>
+              <h2>{session.mode === "classic" ? t("Classic") : session.mode === "date_night" ? t("{name} responds", { name: active.name }) : session.mode === "icebreaker" ? t("{name} facilitates", { name: active.name }) : t("{name}'s turn", { name: active.name })}</h2>
             </div>
-            <p className="score-target">{session.mode === "date_night" ? t(session.dateVariant === "free_minds" ? "Free Minds" : "Shared milestone") : session.mode === "icebreaker" ? t("Together to 15") : t("First to 21")}</p>
+            <p className="score-target">{session.mode === "classic" ? t("Guided sequence") : session.mode === "date_night" ? t(session.dateVariant === "free_minds" ? "Free Minds" : "Shared milestone") : session.mode === "icebreaker" ? t("Together to 15") : t("First to 21")}</p>
           </div>
-          {session.mode !== "inner_circle" ? <SharedMeter session={session} /> : <ScorePanel session={session} />}
+          {session.mode === "classic" ? <ClassicProgress session={session} /> : session.mode !== "inner_circle" ? <SharedMeter session={session} /> : <ScorePanel session={session} />}
           <p className="points-guidance">{guidance}</p>
           {freeMindsReward && (
             <article className="reward-card milestone-reward-card">
@@ -1236,8 +1254,18 @@ function AdaptiveRoomScreen({
               </div>
             </div>
           )}
+          {session.mode === "classic" && session.phase === "classic_bonus_choice" && (
+            <div className="ending-picker">
+              <p className="eyebrow">{t("The 36 questions are complete")}</p>
+              <h3>{t("Keep going with the bonus Classic deck?")}</h3>
+              <div className="ending-actions">
+                <button className="primary-button" disabled={pending || !hasAction("continue_bonus")} onClick={() => onAction("continue_bonus")}>{t("Continue with bonus prompts")}</button>
+                <button className="secondary-button" disabled={pending || !hasAction("end_classic")} onClick={() => onAction("end_classic")}>{t("End Classic session")}</button>
+              </div>
+            </div>
+          )}
           <ActionDock
-            actions={session.availableActions}
+            actions={session.mode === "classic" && session.phase === "classic_bonus_choice" ? [] : session.availableActions}
             prompt={prompt}
             canSave={Boolean(prompt && publicPrompt)}
             saved={Boolean(prompt && savedIds.includes(prompt.id))}
@@ -1265,7 +1293,13 @@ function AdaptiveLobby({ session, hasAction, pending, onAction }: {
     ? "Waiting for one partner to join this shared Table."
     : "Both partners are here. The host can begin when you are comfortable.";
   let action = "Start A Table 4 Two";
-  if (session.mode !== "date_night") {
+  if (session.mode === "classic") {
+    title = "The classic two-person sequence.";
+    copy = session.players.length === 1
+      ? "Waiting for one partner to join the 36 questions."
+      : "Both partners are here. The host can begin the Classic sequence.";
+    action = "Start Classic";
+  } else if (session.mode !== "date_night") {
     const group = session.mode === "inner_circle" ? "friends" : "players";
     title = session.mode === "inner_circle" ? "Gather your inner circle." : "Open the room gently.";
     copy = needed > 0
@@ -1298,6 +1332,33 @@ function AdaptiveLobby({ session, hasAction, pending, onAction }: {
       {hasAction("start_match") && <button className="primary-button" disabled={pending} onClick={() => onAction("start_match")}>{t(action)}</button>}
     </div>
   );
+}
+
+function ClassicProgress({ session }: { session: AdaptiveSession }) {
+  const { t } = useI18n();
+  const total = session.classicStage === "bonus"
+    ? (session.classicIndex || 0) + (session.remainingByLevel?.bonus || 0)
+    : 36;
+  const current = Math.min(session.classicIndex || 0, total);
+  const label = session.classicStage === "bonus" ? "Bonus prompts" : "Arthur Aron's 36 questions";
+  return (
+    <div className="shared-meter classic-progress">
+      <div className="meter-copy">
+        <span>{t(label)}</span>
+        <strong>{current} / {total}</strong>
+      </div>
+      <div className="meter-track" aria-hidden="true"><span style={{ width: `${Math.min(100, (current / total) * 100)}%` }} /></div>
+      <div className="level-progress">
+        <span>{t("Section: {section}", { section: t(session.classicStage === "bonus" ? "Bonus" : classicAronSetName(current)) })}</span>
+      </div>
+    </div>
+  );
+}
+
+function classicAronSetName(index: number) {
+  if (index <= 12) return "Set I";
+  if (index <= 24) return "Set II";
+  return "Set III";
 }
 
 function SharedMeter({ session }: { session: AdaptiveSession }) {
@@ -1438,9 +1499,12 @@ function ActionDock({ actions, prompt, canSave, saved, pending, onAction, onSave
 }) {
   const { t } = useI18n();
   const controls: Array<[string, string, string]> = [
+    ["next_prompt", "Next prompt", "primary-button"],
     ["spin_target", "Spin for responder", "primary-button"],
     ["complete", "Completed", "primary-button"],
     ["pass", "Pass", "secondary-button"],
+    ["continue_bonus", "Continue with bonus prompts", "primary-button"],
+    ["end_classic", "End Classic session", "secondary-button"],
     ["bailout", "Bailout", "text-button bailout-button"],
     ["claim", "Claim this prompt", "primary-button"],
     ["discard", "Discard", "secondary-button"],
@@ -1479,6 +1543,17 @@ function AdaptiveResults({ session, onLeave }: { session: AdaptiveSession; onLea
     const winners = (session.winnerIds || []).map((id) => session.players.find((item) => item.id === id)?.name).filter(Boolean).join(" & ");
     title = (session.winnerIds?.length || 0) > 1 ? t("{winners} tie.", { winners }) : t("{winner} wins.", { winner: winners });
     copy = session.endReason === "score_target" ? "The first player reached 21 points." : "The prompts are complete. Highest score takes the match.";
+  } else if (session.mode === "classic") {
+    title = session.endReason === "classic_complete"
+      ? "You completed the Classic sequence."
+      : session.endReason === "classic_arons_complete"
+        ? "You completed the 36 questions."
+        : "Classic session ended.";
+    copy = session.endReason === "classic_complete"
+      ? "You finished the 36 questions and the bonus Classic prompts."
+      : session.endReason === "classic_arons_complete"
+        ? "You finished Arthur Aron's 36 questions and chose to close there."
+        : "You ended after {score} Classic prompts.";
   } else if (session.mode === "date_night") {
     title = session.endReason === "milestone" ? "You reached a shared milestone." : "Thank you for meeting each other here.";
     copy = session.endReason === "milestone"
@@ -1490,7 +1565,9 @@ function AdaptiveResults({ session, onLeave }: { session: AdaptiveSession; onLea
       ? "Together you built {score} points of group connection."
       : "Your group built {score} points before the available prompts ended.";
   }
-  const score = session.mode === "date_night" ? session.connectionScore || 0 : session.groupScore || 0;
+  const score = session.mode === "classic"
+    ? session.classicIndex || 0
+    : session.mode === "date_night" ? session.connectionScore || 0 : session.groupScore || 0;
   const revealedReward = session.revealedReward ? reward(session.revealedReward) : null;
   return (
     <div className="points-results">
@@ -1516,6 +1593,11 @@ function adaptiveGuidance(
   hasAction: (action: string) => boolean,
   t: I18n["t"]
 ) {
+  if (session.mode === "classic") {
+    if (session.phase === "classic_bonus_choice") return t("You completed the 36 questions. Continue if you want a looser bonus round.");
+    if (session.phase === "classic_prompt") return t("Both partners answer aloud. Pass is always available.");
+    return "";
+  }
   if (session.mode === "date_night") {
     if (session.phase === "choose_milestone_reward") return t("Milestone reached. Choose a shared reward, then keep going.");
     if (session.phase === "choose_ending") return t("You reached your shared milestone. Either partner can choose how to close tonight.");

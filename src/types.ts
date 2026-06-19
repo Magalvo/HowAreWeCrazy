@@ -1,6 +1,6 @@
 export type Audience = "couple" | "friends" | "group";
 export type PlayMode = "local" | "host" | "join";
-export type RoomMode = "conversation" | "date_night" | "inner_circle" | "icebreaker";
+export type RoomMode = "conversation" | "classic" | "date_night" | "inner_circle" | "icebreaker";
 export type AdaptiveMode = Exclude<RoomMode, "conversation">;
 export type ScreenName = "setup" | "adaptive" | "game" | "transition" | "results" | "library";
 
@@ -74,6 +74,10 @@ export interface AdaptiveSession {
   currentChallenge?: Challenge | null;
   targetablePlayerIds?: string[];
   promptFilters?: PromptFilters;
+  classicStage?: "aron" | "bonus" | "finished";
+  classicIndex?: number;
+  classicBonusOffered?: boolean;
+  classicCompletedAron?: boolean;
   connectionScore?: number;
   nextMilestoneScore?: number;
   groupScore?: number;

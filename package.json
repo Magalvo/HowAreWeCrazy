@@ -12,7 +12,7 @@
     "start": "node scripts/dev-server.mjs --production",
     "build": "tsc --noEmit && vite build",
     "test": "node --test",
-    "check": "node --check game-engine.js && node --check adaptive-engine.js && node --check data/prompts.js && node --check data/date-rewards.js && node --check server/room-store.js && node --check server/app-server.js && node --check scripts/dev-server.mjs && tsc --noEmit && node --test"
+    "check": "node --check game-engine.js && node --check adaptive-engine.js && node --check data/prompts.js && node --check data/classic-prompts.js && node --check data/date-rewards.js && node --check server/room-store.js && node --check server/app-server.js && node --check scripts/dev-server.mjs && tsc --noEmit && node --test"
   },
   "dependencies": {
     "@iconify-react/ic": "^1.0.2",

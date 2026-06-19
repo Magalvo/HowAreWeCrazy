@@ -186,3 +186,28 @@ test("A Table 4 Two publishes prompts to both partners immediately after level s
   )).json();
   assert.ok(view.session.currentChallenge.prompt.text);
 });
+
+test("Classic publishes public prompts and lets either partner advance", async (t) => {
+  const { server, origin } = await openTestServer();
+  t.after(() => server.close());
+
+  const created = await (await postJson(origin, "/api/rooms", { mode: "classic" })).json();
+  const partner = await (await postJson(origin, "/api/rooms/ROOM7/join", { name: "Lee" })).json();
+  await postJson(origin, "/api/rooms/ROOM7/actions", {
+    action: "start_match",
+    participantToken: created.participantToken
+  });
+  let view = await (await fetch(
+    `${origin}/api/rooms/ROOM7?participantToken=${partner.participantToken}`
+  )).json();
+  assert.equal(view.session.currentChallenge.prompt.id, "aron01");
+
+  await postJson(origin, "/api/rooms/ROOM7/actions", {
+    action: "next_prompt",
+    participantToken: partner.participantToken
+  });
+  view = await (await fetch(
+    `${origin}/api/rooms/ROOM7?participantToken=${created.participantToken}`
+  )).json();
+  assert.equal(view.session.currentChallenge.prompt.id, "aron02");
+});

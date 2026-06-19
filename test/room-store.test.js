@@ -109,6 +109,21 @@ test("A Table 4 Two accepts exactly a pair and broadcasts its revealed prompt", 
   assert.ok(store.getRoom("PLAY5", partner.participantToken).session.currentChallenge.prompt.text);
 });
 
+test("Classic accepts exactly a pair and allows either participant to advance", () => {
+  const store = createFixedStore();
+  const created = store.createRoom({ mode: "classic", hostName: "Ari" });
+  const partner = store.joinRoom("PLAY5", "Lee");
+  assert.throws(() => store.joinRoom("PLAY5", "Extra"), /full/);
+
+  store.act("PLAY5", created.participantToken, "start_match");
+  let view = store.getRoom("PLAY5", partner.participantToken);
+  assert.equal(view.session.currentChallenge.prompt.id, "aron01");
+
+  store.act("PLAY5", partner.participantToken, "next_prompt");
+  view = store.getRoom("PLAY5", created.participantToken);
+  assert.equal(view.session.currentChallenge.prompt.id, "aron02");
+});
+
 test("A Table 4 Two room creation accepts and exposes safe custom theme filters", () => {
   const store = createFixedStore();
   const created = store.createRoom({
