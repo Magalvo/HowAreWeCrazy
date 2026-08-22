@@ -3,6 +3,24 @@ export type PlayMode = "local" | "host" | "join";
 export type RoomMode = "conversation" | "classic" | "date_night" | "inner_circle" | "icebreaker";
 export type AdaptiveMode = Exclude<RoomMode, "conversation">;
 export type ScreenName = "setup" | "adaptive" | "game" | "transition" | "results" | "library";
+export type DateVariant = "classic" | "free_minds";
+
+/** Everything the setup screen collects before a session or a room exists. */
+export interface SetupState {
+  playMode: PlayMode;
+  roomMode: RoomMode;
+  audience: Audience;
+  playerNames: string;
+  hostName: string;
+  cardsPerLevel: number;
+  selectedThemeTags: string[];
+  includeSpicy: boolean;
+  dateVariant: DateVariant;
+  agreement: boolean;
+  joinCode: string;
+  joinName: string;
+  joinAgreement: boolean;
+}
 
 export interface Prompt {
   id: string;
@@ -60,7 +78,7 @@ export interface Challenge {
 
 export interface AdaptiveSession {
   mode: AdaptiveMode;
-  dateVariant?: "classic" | "free_minds";
+  dateVariant?: DateVariant;
   status: "lobby" | "playing" | "finished";
   phase: string;
   players: AdaptivePlayer[];
