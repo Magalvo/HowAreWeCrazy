@@ -4,18 +4,19 @@ import { once } from "node:events";
 import { createAppServer } from "../server/app-server.js";
 import { createRoomStore } from "../server/room-store.js";
 
-async function openTestServer() {
+async function openTestServer(storeOptions = {}) {
   let tokenIndex = 0;
   const store = createRoomStore({
     createCode: () => "ROOM7",
     createToken: () => `id-${tokenIndex += 1}`,
-    random: () => 0.2
+    random: () => 0.2,
+    ...storeOptions
   });
   const server = createAppServer({ store });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   const { port } = server.address();
-  return { server, origin: `http://127.0.0.1:${port}` };
+  return { server, origin: `http://127.0.0.1:${port}`, store };
 }
 
 async function postJson(origin, path, body) {
@@ -185,6 +186,28 @@ test("A Table 4 Two publishes prompts to both partners immediately after level s
     `${origin}/api/rooms/ROOM7?participantToken=${partner.participantToken}`
   )).json();
   assert.ok(view.session.currentChallenge.prompt.text);
+});
+
+test("event stream ends once its idle room is released", async (t) => {
+  let time = 0;
+  const { server, origin, store } = await openTestServer({
+    clock: () => time,
+    roomTtlMs: 1_000,
+    sweepIntervalMs: 0
+  });
+  t.after(() => server.close());
+
+  const created = await (await postJson(origin, "/api/rooms", { mode: "icebreaker" })).json();
+  const response = await fetch(
+    `${origin}/api/rooms/ROOM7/events?participantToken=${created.participantToken}`
+  );
+  const reader = response.body.getReader();
+  await reader.read();
+
+  time = 2_000;
+  assert.equal(store.sweepRooms(), 1);
+
+  assert.equal((await reader.read()).done, true);
 });
 
 test("Classic publishes public prompts and lets either partner advance", async (t) => {

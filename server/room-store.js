@@ -38,9 +38,17 @@ export function createRoomStore({
   createToken = randomUUID,
   random = Math.random,
   now = () => new Date().toISOString(),
-  disconnectGraceMs = 10_000
+  clock = () => Date.now(),
+  disconnectGraceMs = 10_000,
+  roomTtlMs = 6 * 60 * 60 * 1000,
+  sweepIntervalMs = 10 * 60 * 1000
 } = {}) {
   const rooms = new Map();
+
+  function touch(room) {
+    room.lastActivityAt = clock();
+    return room;
+  }
 
   function requireRoom(code) {
     const room = rooms.get(normalizeCode(code));
@@ -49,7 +57,47 @@ export function createRoomStore({
       error.statusCode = 404;
       throw error;
     }
-    return room;
+    return touch(room);
+  }
+
+  function listenersOf(room) {
+    return Array.from(room.listeners, (entry) => (typeof entry === "function" ? entry : entry.listener));
+  }
+
+  // Releasing a room also has to release everything it holds open: pending presence
+  // timers, and the event streams still waiting on it. Subscribers receive null so the
+  // transport can end the response instead of leaving an idle connection behind.
+  function closeRoom(room) {
+    room.closed = true;
+    room.disconnectTimers?.forEach((timer) => clearTimeout(timer));
+    room.disconnectTimers?.clear();
+    room.connectionCounts?.clear();
+    const listeners = listenersOf(room);
+    room.listeners.clear();
+    rooms.delete(room.code);
+    listeners.forEach((listener) => listener(null));
+  }
+
+  function sweepRooms() {
+    const deadline = clock() - roomTtlMs;
+    let released = 0;
+    Array.from(rooms.values())
+      .filter((room) => room.lastActivityAt <= deadline)
+      .forEach((room) => {
+        closeRoom(room);
+        released += 1;
+      });
+    return released;
+  }
+
+  const sweepTimer = sweepIntervalMs > 0 ? setInterval(sweepRooms, sweepIntervalMs) : null;
+  sweepTimer?.unref?.();
+
+  function stop() {
+    if (sweepTimer) {
+      clearInterval(sweepTimer);
+    }
+    Array.from(rooms.values()).forEach(closeRoom);
   }
 
   function memberByToken(room, participantToken) {
@@ -140,6 +188,7 @@ export function createRoomStore({
         members: [{ id: host.id, participantToken }],
         session: createAdaptiveMatch({ mode: normalizedMode, participants: [host], random, promptFilters, dateVariant }),
         createdAt: now(),
+        lastActivityAt: clock(),
         listeners: new Set(),
         disconnectTimers: new Map(),
         connectionCounts: new Map()
@@ -160,6 +209,7 @@ export function createRoomStore({
       participants: [host],
       session: createSession({ audience, playerNames, cardsPerLevel: Number(cardsPerLevel), random }),
       createdAt: now(),
+      lastActivityAt: clock(),
       listeners: new Set()
     };
     rooms.set(code, room);
@@ -276,6 +326,9 @@ export function createRoomStore({
       connectParticipant(room, member);
       listener(publicRoom(room, participantToken));
       return () => {
+        if (room.closed) {
+          return;
+        }
         room.listeners.delete(entry);
         disconnectParticipant(room, member);
       };
@@ -287,5 +340,5 @@ export function createRoomStore({
     return () => room.listeners.delete(callback);
   }
 
-  return { act, createRoom, getRoom, joinRoom, subscribe };
+  return { act, createRoom, getRoom, joinRoom, roomCount: () => rooms.size, stop, subscribe, sweepRooms };
 }

@@ -74,11 +74,16 @@ export function createAppServer({ root = resolve(process.cwd()), store = createR
           "Content-Type": "text/event-stream",
           "X-Accel-Buffering": "no"
         });
-        const unsubscribe = store.subscribe(eventsMatch[1], participantToken, (room) => {
-          response.write(`event: room\ndata: ${JSON.stringify(room)}\n\n`);
-        });
         const heartbeat = setInterval(() => response.write(": keep-alive\n\n"), 25_000);
         heartbeat.unref?.();
+        const unsubscribe = store.subscribe(eventsMatch[1], participantToken, (room) => {
+          if (!room) {
+            clearInterval(heartbeat);
+            response.end();
+            return;
+          }
+          response.write(`event: room\ndata: ${JSON.stringify(room)}\n\n`);
+        });
         request.on("close", () => {
           clearInterval(heartbeat);
           unsubscribe();

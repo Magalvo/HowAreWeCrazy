@@ -157,6 +157,59 @@ test("room creation rejects invalid custom filters", () => {
   );
 });
 
+function createIdleStore(currentTime) {
+  let tokenIndex = 0;
+  return createRoomStore({
+    createCode: () => "PLAY5",
+    createToken: () => `token-${tokenIndex += 1}`,
+    random: () => 0.2,
+    clock: () => currentTime(),
+    roomTtlMs: 1_000,
+    sweepIntervalMs: 0
+  });
+}
+
+test("releases rooms that go idle and closes the streams still waiting on them", () => {
+  let time = 0;
+  const store = createIdleStore(() => time);
+  const created = store.createRoom({ mode: "inner_circle" });
+  const updates = [];
+  store.subscribe("PLAY5", created.participantToken, (room) => updates.push(room));
+
+  time = 500;
+  assert.equal(store.sweepRooms(), 0);
+  assert.equal(store.roomCount(), 1);
+
+  time = 2_000;
+  assert.equal(store.sweepRooms(), 1);
+  assert.equal(store.roomCount(), 0);
+  assert.equal(updates.at(-1), null);
+  assert.throws(() => store.getRoom("PLAY5", created.participantToken), /Room not found/);
+});
+
+test("keeps a room alive while participants are still using it", () => {
+  let time = 0;
+  const store = createIdleStore(() => time);
+  const created = store.createRoom({ audience: "friends", cardsPerLevel: 4 });
+
+  time = 900;
+  store.act("PLAY5", created.hostToken, "reveal");
+  time = 1_500;
+
+  assert.equal(store.sweepRooms(), 0);
+  assert.equal(store.roomCount(), 1);
+});
+
+test("stopping the store releases every room it still holds", () => {
+  let time = 0;
+  const store = createIdleStore(() => time);
+  store.createRoom({ mode: "icebreaker" });
+
+  store.stop();
+
+  assert.equal(store.roomCount(), 0);
+});
+
 test("Icebreaker conceals a chosen prompt until a server-selected spin target exists", () => {
   const store = createFixedStore();
   const created = store.createRoom({ mode: "icebreaker" });
