@@ -8,7 +8,6 @@ export const LANGUAGES: Array<{ code: Language; label: string }> = [
 ];
 
 const UI_PT: Record<string, string> = {
-  "Open Thread": "Open Thread",
   Install: "Instalar",
   Saved: "Guardadas",
   "Conversation card game": "Jogo de cartas de conversa",

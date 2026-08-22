@@ -50,7 +50,7 @@ API, and live updates together from one HTTPS URL.
 
 1. Push this project to a GitHub, GitLab, or Bitbucket repository.
 2. In Render, select **New > Blueprint** and connect that repository.
-3. Confirm the `open-thread-playtest` web service configuration from `render.yaml`.
+3. Confirm the `how-are-we-crazy-playtest` web service configuration from `render.yaml`.
 4. Deploy the Blueprint and open the provided `onrender.com` URL on the host phone.
 5. Create a live room and use **Share invite** so each participant opens the same public
    URL on their own phone.
@@ -58,6 +58,10 @@ API, and live updates together from one HTTPS URL.
 The Blueprint uses the paid `starter` instance rather than a sleeping free service.
 Conversation sessions can include long quiet pauses, so an always-on instance avoids
 cold-start interruptions during a game. Render verifies availability through `GET /health`.
+
+Live rooms are held in the memory of that single instance. A room is released after six
+hours without activity, and every open room is lost when the service restarts or
+redeploys, so avoid deploying while a group is playing.
 
 ### Playtest Limitation
 

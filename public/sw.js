@@ -1,4 +1,4 @@
-const CACHE_NAME = "open-thread-v10";
+const CACHE_NAME = "how-are-we-crazy-v11";
 const SHELL_ASSETS = ["/", "/manifest.webmanifest", "/assets/icon.svg"];
 
 self.addEventListener("install", (event) => {
