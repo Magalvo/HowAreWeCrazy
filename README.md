@@ -50,10 +50,16 @@ API, and live updates together from one HTTPS URL.
 
 1. Push this project to a GitHub, GitLab, or Bitbucket repository.
 2. In Render, select **New > Blueprint** and connect that repository.
-3. Confirm the `how-are-we-crazy-playtest` web service configuration from `render.yaml`.
-4. Deploy the Blueprint and open the provided `onrender.com` URL on the host phone.
+3. Confirm the `open-thread-playtest` web service configuration from `render.yaml`.
+4. Deploy the Blueprint and open the service URL on the host phone.
 5. Create a live room and use **Share invite** so each participant opens the same public
    URL on their own phone.
+
+The service is served at <https://howarewecrazy.magalvo.com>, a custom domain whose
+certificate Render binds to the service named in the Blueprint. The service keeps the
+name it was first deployed under: renaming it would make Render build a separate service
+and leave the domain stranded on the old one. Invite links follow whichever host the app
+was opened from, so nothing in the client needs to know about this.
 
 The Blueprint uses the paid `starter` instance rather than a sleeping free service.
 Conversation sessions can include long quiet pauses, so an always-on instance avoids

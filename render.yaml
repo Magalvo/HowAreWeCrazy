@@ -1,6 +1,10 @@
 services:
   - type: web
-    name: how-are-we-crazy-playtest
+    # Render identifies a blueprint service by this name, and the custom domain
+    # howarewecrazy.magalvo.com plus its certificate are bound to this one. Renaming it
+    # makes Render build a separate service and strands the domain on the old one, so
+    # this stays as it is even though the product is now called How Are We Crazy.
+    name: open-thread-playtest
     runtime: node
     region: frankfurt
     plan: starter
