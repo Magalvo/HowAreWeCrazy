@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   advance,
   continueLevel,
@@ -71,7 +71,7 @@ export function App() {
   const [snapshot, setSnapshot] = useState<RoomSnapshot | null>(null);
   const [savedIds, setSavedIds] = useState<string[]>(() => loadJson<string[]>(SAVED_KEY) ?? []);
   const [screen, setScreen] = useState<ScreenName>("setup");
-  const [previousScreen, setPreviousScreen] = useState<ScreenName>("setup");
+  const returnScreenRef = useRef<ScreenName>("setup");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [pending, setPending] = useState(false);
 
@@ -141,6 +141,12 @@ export function App() {
     }
   }, [activeRoom, adaptive, conversation, screen]);
 
+  useEffect(() => {
+    if (screen !== "library") {
+      returnScreenRef.current = screen;
+    }
+  }, [screen]);
+
   function openCurrentSession(nextSession: ConversationSession | AdaptiveSession | null = session) {
     if (!nextSession) {
       setScreen("setup");
@@ -156,11 +162,16 @@ export function App() {
   }
 
   function goTo(next: ScreenName) {
-    if (next !== "library") {
-      setPreviousScreen(next);
-    }
     setScreen(next);
     window.scrollTo(0, 0);
+  }
+
+  // Saved cards open over whatever was on screen, so closing them returns there. Play
+  // screens are opened straight through setScreen, which is why the screen to come back
+  // to is recorded on every change rather than by one entry point.
+  function closeLibrary() {
+    const target = returnScreenRef.current;
+    goTo(target !== "setup" && !session ? "setup" : target);
   }
 
   function enterRoom(connection: RoomConnection, role: "host" | "player") {
@@ -489,7 +500,7 @@ export function App() {
         {screen === "library" && (
           <LibraryScreen
             savedIds={savedIds}
-            onClose={() => setScreen(previousScreen)}
+            onClose={closeLibrary}
             onRemove={toggleSaved}
             onClear={() => { setSavedIds([]); notice(i18n.t("Saved cards cleared")); }}
           />
