@@ -14,7 +14,8 @@
     "test": "npm run test:node && npm run test:web",
     "test:node": "node --test \"test/*.test.js\"",
     "test:web": "vitest run",
-    "check": "node --check game-engine.js && node --check adaptive-engine.js && node --check data/prompts.js && node --check data/classic-prompts.js && node --check data/date-rewards.js && node --check server/room-store.js && node --check server/app-server.js && node --check scripts/dev-server.mjs && tsc --noEmit && npm test"
+    "check": "node --check game-engine.js && node --check adaptive-engine.js && node --check caption-engine.js && node --check data/prompts.js && node --check data/classic-prompts.js && node --check data/date-rewards.js && node --check data/caption-cards.js && node --check data/meme-images.js && node --check server/room-store.js && node --check server/app-server.js && node --check scripts/dev-server.mjs && tsc --noEmit && npm test",
+    "cards:refresh": "node scripts/fetch-meme-images.mjs"
   },
   "dependencies": {
     "@iconify-react/ic": "^1.0.2",
