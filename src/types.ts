@@ -1,7 +1,7 @@
 export type Audience = "couple" | "friends" | "group";
 export type PlayMode = "local" | "host" | "join";
-export type RoomMode = "conversation" | "classic" | "date_night" | "inner_circle" | "icebreaker";
-export type AdaptiveMode = Exclude<RoomMode, "conversation">;
+export type AdaptiveMode = "classic" | "date_night" | "inner_circle" | "icebreaker";
+export type RoomMode = "conversation" | AdaptiveMode | "caption";
 export type ScreenName = "setup" | "adaptive" | "game" | "transition" | "results" | "library";
 export type DateVariant = "classic" | "free_minds";
 
@@ -107,6 +107,65 @@ export interface AdaptiveSession {
   milestoneRewards?: Array<{ id: string; text: string; type?: "activity" | "question" }>;
 }
 
+export interface CaptionCard {
+  id: string;
+  text: string;
+}
+
+export interface MemeImage {
+  id: string;
+  name: string;
+  url: string;
+  width: number;
+  height: number;
+}
+
+export interface CaptionPlayer {
+  id: string;
+  name: string;
+  role: "host" | "player";
+  connected: boolean;
+  score: number;
+  handCount: number;
+}
+
+/** A played caption. Its author is withheld until the round has been judged. */
+export interface CaptionReveal {
+  cardId: string;
+  text: string;
+  playerId?: string;
+}
+
+export interface CaptionRoundResult {
+  imageId: string;
+  winnerId: string;
+  winningCardId: string;
+  judgeId: string;
+}
+
+export interface CaptionSession {
+  mode: "caption";
+  status: "lobby" | "playing" | "finished";
+  phase: "submitting" | "judging" | "round_won" | null;
+  roundNumber: number;
+  scoreTarget: number;
+  judgeId: string | null;
+  viewerId: string;
+  isJudge: boolean;
+  players: CaptionPlayer[];
+  hand: CaptionCard[];
+  image: MemeImage | null;
+  submittedPlayerIds: string[];
+  awaitingPlayerIds: string[];
+  reveal: CaptionReveal[];
+  lastRound: CaptionRoundResult | null;
+  winnerIds: string[];
+  endReason: string | null;
+  captionsRemaining: number;
+  imagesRemaining: number;
+  availableActions: string[];
+}
+
 export interface Participant {
   id: string;
   name: string;
@@ -114,7 +173,7 @@ export interface Participant {
   connected?: boolean;
 }
 
-export interface RoomSnapshot<T = ConversationSession | AdaptiveSession> {
+export interface RoomSnapshot<T = ConversationSession | AdaptiveSession | CaptionSession> {
   code: string;
   mode: RoomMode;
   participants: Participant[];

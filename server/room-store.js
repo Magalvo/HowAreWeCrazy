@@ -1,15 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { advance, continueLevel, createSession, reveal } from "../game-engine.js";
-import {
-  adaptiveView,
-  addAdaptiveLobbyPlayer,
-  canHostSkipAdaptive,
-  createAdaptiveMatch,
-  isAdaptiveMode,
-  normalizeAdaptiveMode,
-  performAdaptiveAction,
-  setAdaptivePresence
-} from "../adaptive-engine.js";
+import { isKnownRoomMode, normalizeRoomMode, seatedFamilyFor } from "./game-families.js";
 
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -108,16 +99,15 @@ export function createRoomStore({
     return member;
   }
 
-  function adaptiveRoom(room) {
-    return isAdaptiveMode(room.mode);
+  function familyOf(room) {
+    return seatedFamilyFor(room.mode);
   }
 
   function publicRoom(room, participantToken) {
-    if (adaptiveRoom(room)) {
+    const family = familyOf(room);
+    if (family) {
       const member = memberByToken(room, participantToken);
-      const view = adaptiveView(room.session, member.id, {
-        canSkip: canHostSkipAdaptive(room.session, member.id)
-      });
+      const view = family.view(room.session, member.id);
       return {
         code: room.code,
         mode: room.mode,
@@ -138,7 +128,7 @@ export function createRoomStore({
   }
 
   function broadcast(room) {
-    if (adaptiveRoom(room)) {
+    if (familyOf(room)) {
       room.listeners.forEach((entry) => entry.listener(publicRoom(room, entry.participantToken)));
       return;
     }
@@ -155,8 +145,8 @@ export function createRoomStore({
     promptFilters,
     dateVariant
   }) {
-    const normalizedMode = normalizeAdaptiveMode(mode);
-    if (normalizedMode !== "conversation" && !isAdaptiveMode(normalizedMode)) {
+    const normalizedMode = normalizeRoomMode(mode);
+    if (!isKnownRoomMode(normalizedMode)) {
       const error = new Error("Invalid room mode");
       error.statusCode = 400;
       throw error;
@@ -179,14 +169,21 @@ export function createRoomStore({
       role: "host"
     };
 
-    if (isAdaptiveMode(normalizedMode)) {
+    const family = seatedFamilyFor(normalizedMode);
+    if (family) {
       const participantToken = createToken();
       const room = {
         code,
         mode: normalizedMode,
         hostToken,
         members: [{ id: host.id, participantToken }],
-        session: createAdaptiveMatch({ mode: normalizedMode, participants: [host], random, promptFilters, dateVariant }),
+        session: family.create({
+          mode: normalizedMode,
+          participants: [host],
+          random,
+          promptFilters,
+          dateVariant
+        }),
         createdAt: now(),
         lastActivityAt: clock(),
         listeners: new Set(),
@@ -218,7 +215,8 @@ export function createRoomStore({
 
   function joinRoom(code, name) {
     const room = requireRoom(code);
-    if (adaptiveRoom(room)) {
+    const family = familyOf(room);
+    if (family) {
       if (room.session.status !== "lobby") {
         const error = new Error("This experience has already started");
         error.statusCode = 409;
@@ -231,7 +229,7 @@ export function createRoomStore({
         role: "player"
       };
       room.members.push({ id: participant.id, participantToken });
-      room.session = addAdaptiveLobbyPlayer(room.session, participant);
+      room.session = family.addPlayer(room.session, participant);
       broadcast(room);
       return {
         room: publicRoom(room, participantToken),
@@ -257,13 +255,11 @@ export function createRoomStore({
 
   function act(code, credential, action, payload = {}) {
     const room = requireRoom(code);
+    const family = familyOf(room);
 
-    if (adaptiveRoom(room)) {
+    if (family) {
       const member = memberByToken(room, credential);
-      room.session = performAdaptiveAction(room.session, member.id, action, {
-        ...payload,
-        canSkip: action === "skip_stalled_turn" && canHostSkipAdaptive(room.session, member.id)
-      }, random);
+      room.session = family.act(room.session, member.id, action, payload, random);
       broadcast(room);
       return publicRoom(room, credential);
     }
@@ -295,7 +291,7 @@ export function createRoomStore({
     const count = (room.connectionCounts.get(member.id) || 0) + 1;
     room.connectionCounts.set(member.id, count);
     if (room.session.players.find((item) => item.id === member.id)?.connected === false) {
-      room.session = setAdaptivePresence(room.session, member.id, true);
+      room.session = familyOf(room).setPresence(room.session, member.id, true, random);
       broadcast(room);
     }
   }
@@ -308,7 +304,7 @@ export function createRoomStore({
     }
     const timer = setTimeout(() => {
       if ((room.connectionCounts.get(member.id) || 0) === 0) {
-        room.session = setAdaptivePresence(room.session, member.id, false);
+        room.session = familyOf(room).setPresence(room.session, member.id, false, random);
         broadcast(room);
       }
       room.disconnectTimers.delete(member.id);
@@ -319,7 +315,7 @@ export function createRoomStore({
 
   function subscribe(code, participantToken, listener) {
     const room = requireRoom(code);
-    if (adaptiveRoom(room)) {
+    if (familyOf(room)) {
       const member = memberByToken(room, participantToken);
       const entry = { participantToken, listener };
       room.listeners.add(entry);

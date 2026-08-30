@@ -15,7 +15,8 @@ const ROOM_EXPERIENCES = [
   ["classic", "2 players | Guided", "Classic", "The 36 questions, then an optional deeper bonus set."],
   ["date_night", "2 players | Shared goal", "A Table 4 Two", "Build a connection milestone together."],
   ["inner_circle", "3-6 friends | Points", "Inner Circle", "Playfully compete with balanced targeting."],
-  ["icebreaker", "3-6 players | Shared goal", "Icebreaker", "Meet the room through fair roulette."]
+  ["icebreaker", "3-6 players | Shared goal", "Icebreaker", "Meet the room through fair roulette."],
+  ["caption", "3-8 players | Points", "Caption Clash", "Everyone captions the image. The judge picks the winner."]
 ] as const;
 
 const DATE_VARIANTS = [
@@ -62,7 +63,8 @@ export function SetupScreen({
       ? "Milestones unlock rewards, then the questions keep going until the deck is complete."
       : "Work together toward a shared milestone, then choose a closing moment.",
     inner_circle: "Private draws and points stay playful through balanced target cooldowns.",
-    icebreaker: "A fair spin chooses responders while everyone builds group progress."
+    icebreaker: "A fair spin chooses responders while everyone builds group progress.",
+    caption: "A rotating judge picks the caption that fits the image best. Images load from the internet."
   }[setup.roomMode];
   const startText = adaptive
     ? setup.playMode === "host"

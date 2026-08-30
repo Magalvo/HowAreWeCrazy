@@ -13,6 +13,11 @@ and save prompts they want to revisit.
 - `A Table 4 Two` live rooms for two phones with a shared connection milestone and optional closing reward.
 - `Inner Circle` live rooms for 3-6 phones with fair targeting, scoring, Bailout, and Double Down.
 - `Icebreaker` live rooms for 3-6 phones with roulette turns and shared group progress.
+- `Caption Clash` live rooms for 3-8 phones: a rotating judge picks the caption that fits
+  the image best. Image templates are snapshotted from Imgflip by
+  `npm run cards:refresh`; Imgflip hosts them without owning them, so its terms cover
+  personal, non-commercial use only. Caption copy is original. This is the one mode that
+  needs the network mid-game, so it does not work offline.
 - Session resume and a locally saved card collection.
 - Installable, responsive PWA with offline support.
 - Original branding and original card copy.

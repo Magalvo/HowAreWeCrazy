@@ -2,8 +2,18 @@ import type { ActiveRoom, AdaptiveSession, Audience, RoomMode } from "./types";
 
 export const ADAPTIVE_MODES = ["classic", "date_night", "inner_circle", "icebreaker", "competitive"];
 
-export function isAdaptiveRoom(room: ActiveRoom | null): boolean {
-  return Boolean(room && ADAPTIVE_MODES.includes(room.mode));
+/**
+ * Modes where every player holds a seat, mirroring the server's seated families.
+ *
+ * This one predicate decides three things at once: that requests carry a participant
+ * token rather than the host token, that the event stream is subscribed to per player,
+ * and that the room opens on its own screen. A mode missing from here authenticates as
+ * the host and is refused.
+ */
+export const SEATED_MODES = [...ADAPTIVE_MODES, "caption"];
+
+export function isSeatedRoom(room: ActiveRoom | null): boolean {
+  return Boolean(room && SEATED_MODES.includes(room.mode));
 }
 
 // `competitive` is the name Inner Circle shipped under first. Rooms created back then
@@ -18,7 +28,8 @@ export function experienceLabel(mode?: string): string {
     date_night: "A Table 4 Two",
     inner_circle: "Inner Circle",
     competitive: "Inner Circle",
-    icebreaker: "Icebreaker"
+    icebreaker: "Icebreaker",
+    caption: "Caption Clash"
   }[mode || ""] || "Conversation";
 }
 

@@ -157,6 +157,85 @@ test("room creation rejects invalid custom filters", () => {
   );
 });
 
+test("a caption room seats up to eight players and keeps each hand private", () => {
+  const store = createFixedStore();
+  const host = store.createRoom({ mode: "caption", hostName: "Ana" });
+  const rui = store.joinRoom("PLAY5", "Rui");
+  const sara = store.joinRoom("PLAY5", "Sara");
+
+  store.act("PLAY5", host.participantToken, "start_match");
+
+  const hostView = store.getRoom("PLAY5", host.participantToken);
+  const ruiView = store.getRoom("PLAY5", rui.participantToken);
+  assert.equal(hostView.session.phase, "submitting");
+  assert.equal(hostView.mode, "caption");
+  assert.equal(hostView.session.hand.length, 7);
+  assert.notDeepEqual(
+    hostView.session.hand.map((card) => card.id),
+    ruiView.session.hand.map((card) => card.id)
+  );
+  assert.ok(hostView.session.players.every((item) => item.hand === undefined));
+  assert.equal(sara.room.session.captionDeck, undefined);
+});
+
+test("a caption room refuses late joins and unknown participants", () => {
+  const store = createFixedStore();
+  const host = store.createRoom({ mode: "caption" });
+  store.joinRoom("PLAY5", "Rui");
+  store.joinRoom("PLAY5", "Sara");
+  store.act("PLAY5", host.participantToken, "start_match");
+
+  assert.throws(() => store.joinRoom("PLAY5", "Late"), /already started/);
+  assert.throws(
+    () => store.act("PLAY5", "wrong-token", "submit_caption", { cardId: "cap-001" }),
+    /Participant access/
+  );
+});
+
+test("a caption round hides played captions until judging opens", () => {
+  const store = createFixedStore();
+  const host = store.createRoom({ mode: "caption", hostName: "Ana" });
+  const rui = store.joinRoom("PLAY5", "Rui");
+  const sara = store.joinRoom("PLAY5", "Sara");
+  store.act("PLAY5", host.participantToken, "start_match");
+
+  const ruiHand = store.getRoom("PLAY5", rui.participantToken).session.hand;
+  store.act("PLAY5", rui.participantToken, "submit_caption", { cardId: ruiHand[0].id });
+
+  const midRound = store.getRoom("PLAY5", host.participantToken).session;
+  assert.equal(midRound.phase, "submitting");
+  assert.deepEqual(midRound.reveal, []);
+  assert.deepEqual(midRound.submittedPlayerIds, [rui.participantId]);
+
+  const saraHand = store.getRoom("PLAY5", sara.participantToken).session.hand;
+  store.act("PLAY5", sara.participantToken, "submit_caption", { cardId: saraHand[0].id });
+
+  const judging = store.getRoom("PLAY5", host.participantToken).session;
+  assert.equal(judging.phase, "judging");
+  assert.equal(judging.reveal.length, 2);
+  assert.ok(judging.reveal.every((entry) => entry.playerId === undefined));
+});
+
+test("caption subscribers each receive their own hand", () => {
+  const store = createFixedStore();
+  const host = store.createRoom({ mode: "caption", hostName: "Ana" });
+  const rui = store.joinRoom("PLAY5", "Rui");
+  store.joinRoom("PLAY5", "Sara");
+  const hostUpdates = [];
+  const ruiUpdates = [];
+  store.subscribe("PLAY5", host.participantToken, (room) => hostUpdates.push(room));
+  store.subscribe("PLAY5", rui.participantToken, (room) => ruiUpdates.push(room));
+
+  store.act("PLAY5", host.participantToken, "start_match");
+
+  const hostHand = hostUpdates.at(-1).session.hand.map((card) => card.id);
+  const ruiHand = ruiUpdates.at(-1).session.hand.map((card) => card.id);
+  assert.equal(hostHand.length, 7);
+  assert.equal(ruiHand.length, 7);
+  assert.notDeepEqual(hostHand, ruiHand);
+  assert.equal(hostUpdates.at(-1).session.viewerId, host.participantId);
+});
+
 function createIdleStore(currentTime) {
   let tokenIndex = 0;
   return createRoomStore({

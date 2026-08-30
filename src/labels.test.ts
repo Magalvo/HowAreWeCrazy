@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   audienceLabel,
   experienceLabel,
-  isAdaptiveRoom,
+  isSeatedRoom,
   localAdaptiveViewerId,
   normalizeExperience,
   pairNames
@@ -40,15 +40,17 @@ describe("experienceLabel", () => {
   });
 });
 
-describe("isAdaptiveRoom", () => {
-  it("treats a conversation room and no room as not adaptive", () => {
-    expect(isAdaptiveRoom(room("conversation"))).toBe(false);
-    expect(isAdaptiveRoom(null)).toBe(false);
+describe("isSeatedRoom", () => {
+  it("treats a conversation room and no room as unseated", () => {
+    expect(isSeatedRoom(room("conversation"))).toBe(false);
+    expect(isSeatedRoom(null)).toBe(false);
   });
 
-  it("recognises every adaptive mode, including the retired name", () => {
-    (["classic", "date_night", "inner_circle", "icebreaker", "competitive"] as const)
-      .forEach((mode) => expect(isAdaptiveRoom(room(mode))).toBe(true));
+  // A mode missing here authenticates as the host and the server refuses it, which is a
+  // silent 403 rather than a type error, so every seated mode is named explicitly.
+  it("recognises every seated mode, including caption and the retired name", () => {
+    (["classic", "date_night", "inner_circle", "icebreaker", "competitive", "caption"] as const)
+      .forEach((mode) => expect(isSeatedRoom(room(mode))).toBe(true));
   });
 });
 

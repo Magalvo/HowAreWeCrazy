@@ -20,7 +20,7 @@ import { I18nContext } from "./i18n-context";
 import {
   audienceLabel,
   experienceLabel,
-  isAdaptiveRoom,
+  isSeatedRoom,
   localAdaptiveViewerId,
   normalizeExperience,
   pairNames
@@ -43,9 +43,11 @@ import {
 import { LibraryScreen } from "./screens/LibraryScreen";
 import { SetupScreen } from "./screens/SetupScreen";
 import { AdaptiveRoomScreen } from "./screens/adaptive/AdaptiveRoomScreen";
+import { CaptionRoomScreen } from "./screens/caption/CaptionRoomScreen";
 import type {
   ActiveRoom,
   AdaptiveSession,
+  CaptionSession,
   ConversationSession,
   RoomConnection,
   RoomSnapshot,
@@ -63,7 +65,7 @@ function delay(ms: number) {
 
 export function App() {
   const invitedCode = new URLSearchParams(window.location.search).get("room")?.toUpperCase().slice(0, 5) || "";
-  const [session, setSession] = useState<ConversationSession | AdaptiveSession | null>(() =>
+  const [session, setSession] = useState<ConversationSession | AdaptiveSession | CaptionSession | null>(() =>
     loadJson<ConversationSession>(SESSION_KEY));
   const [language, setLanguage] = useState<Language>(() =>
     loadJson<Language>(LANGUAGE_KEY) || (navigator.language === "pt-PT" ? "pt-PT" : "en"));
@@ -99,20 +101,23 @@ export function App() {
     onReconnecting: () => notice(i18n.t("Reconnecting to live room..."))
   });
 
-  const adaptiveMatch = session && "mode" in session ? session as AdaptiveSession : null;
+  const caption = session && "mode" in session && session.mode === "caption"
+    ? session as CaptionSession
+    : null;
+  const adaptiveMatch = session && !caption && "mode" in session ? session as AdaptiveSession : null;
   const adaptive = adaptiveMatch
     ? activeRoom
       ? adaptiveMatch
       : adaptiveView(adaptiveMatch, localAdaptiveViewerId(adaptiveMatch)) as AdaptiveSession
     : null;
-  const conversation = !adaptive && session ? session as ConversationSession : null;
+  const conversation = !adaptive && !caption && session ? session as ConversationSession : null;
   const host = !activeRoom || activeRoom.role === "host";
 
   useEffect(() => {
-    const theme = adaptive?.mode ||
+    const theme = caption?.mode || adaptive?.mode ||
       (screen === "setup" && setup.playMode !== "join" ? normalizeExperience(setup.roomMode) : "conversation");
     document.body.dataset.experience = theme;
-  }, [adaptive?.mode, screen, setup.playMode, setup.roomMode]);
+  }, [adaptive?.mode, caption?.mode, screen, setup.playMode, setup.roomMode]);
 
   useEffect(() => {
     // Only an unfinished single-phone conversation is worth resuming; a live room is
@@ -132,14 +137,14 @@ export function App() {
   }, [activeRoom, language, savedIds, session]);
 
   useEffect(() => {
-    if (!activeRoom || adaptive || !conversation || !["game", "transition", "results"].includes(screen)) {
+    if (!activeRoom || adaptive || caption || !conversation || !["game", "transition", "results"].includes(screen)) {
       return;
     }
     const expected = conversation.completed ? "results" : conversation.betweenLevels ? "transition" : "game";
     if (screen !== expected) {
       setScreen(expected);
     }
-  }, [activeRoom, adaptive, conversation, screen]);
+  }, [activeRoom, adaptive, caption, conversation, screen]);
 
   useEffect(() => {
     if (screen !== "library") {
@@ -147,7 +152,7 @@ export function App() {
     }
   }, [screen]);
 
-  function openCurrentSession(nextSession: ConversationSession | AdaptiveSession | null = session) {
+  function openCurrentSession(nextSession: ConversationSession | AdaptiveSession | CaptionSession | null = session) {
     if (!nextSession) {
       setScreen("setup");
     } else if ("mode" in nextSession) {
@@ -186,7 +191,7 @@ export function App() {
     setActiveRoom(room);
     setSnapshot(connection.room);
     setSession(connection.room.session);
-    setScreen(isAdaptiveRoom(room) ? "adaptive" : "game");
+    setScreen(isSeatedRoom(room) ? "adaptive" : "game");
   }
 
   function leaveRoom() {
@@ -289,7 +294,7 @@ export function App() {
       }
       return;
     }
-    if (!activeRoom || pending || (!isAdaptiveRoom(activeRoom) && !host)) {
+    if (!activeRoom || pending || (!isSeatedRoom(activeRoom) && !host)) {
       return;
     }
     const spin = action === "spin_target";
@@ -298,7 +303,7 @@ export function App() {
       beginSpin();
     }
     try {
-      const authorization = isAdaptiveRoom(activeRoom)
+      const authorization = isSeatedRoom(activeRoom)
         ? { participantToken: activeRoom.participantToken }
         : { hostToken: activeRoom.hostToken };
       const request = requestJson<RoomSnapshot>(`/api/rooms/${activeRoom.code}/actions`, {
@@ -427,6 +432,16 @@ export function App() {
             onDiscard={() => { leaveRoom(); setSession(null); }}
             onSubmit={(event) => void handleSetupSubmit(event)}
             onJoin={(event) => void handleJoinSubmit(event)}
+          />
+        )}
+        {screen === "adaptive" && caption && activeRoom && (
+          <CaptionRoomScreen
+            session={caption}
+            roomCode={activeRoom.code}
+            pending={pending}
+            onInvite={() => setInviteOpen(true)}
+            onAction={(action, payload) => void sendRoomAction(action, payload)}
+            onLeave={() => { leaveRoom(); goTo("setup"); }}
           />
         )}
         {screen === "adaptive" && adaptive && (

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { requestJson } from "../api";
-import { isAdaptiveRoom } from "../labels";
+import { isSeatedRoom } from "../labels";
 import type { ActiveRoom, AdaptiveSession, RoomSnapshot } from "../types";
 
 interface RoomStreamHandlers {
@@ -53,7 +53,7 @@ export function useRoomStream(activeRoom: ActiveRoom | null, handlers: RoomStrea
       return;
     }
     let cancelled = false;
-    const query = isAdaptiveRoom(activeRoom)
+    const query = isSeatedRoom(activeRoom)
       ? `?participantToken=${encodeURIComponent(activeRoom.participantToken || "")}`
       : "";
     const acceptSnapshot = (room: RoomSnapshot) => {
