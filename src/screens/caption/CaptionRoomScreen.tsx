@@ -62,7 +62,7 @@ function Hand({ session, pending, onAction }: {
   pending: boolean;
   onAction: Action;
 }) {
-  const { t } = useI18n();
+  const { caption, t } = useI18n();
   const mayPlay = session.availableActions.includes("submit_caption");
   return (
     <div className="caption-hand">
@@ -76,7 +76,7 @@ function Hand({ session, pending, onAction }: {
             disabled={!mayPlay || pending}
             onClick={() => onAction("submit_caption", { cardId: card.id })}
           >
-            {card.text}
+            {caption(card).text}
           </button>
         ))}
       </div>
@@ -102,7 +102,7 @@ function Judging({ session, pending, onAction }: {
   pending: boolean;
   onAction: Action;
 }) {
-  const { t } = useI18n();
+  const { caption, t } = useI18n();
   const mayJudge = session.availableActions.includes("choose_winner");
   return (
     <div className="caption-reveal">
@@ -120,7 +120,7 @@ function Judging({ session, pending, onAction }: {
             disabled={!mayJudge || pending}
             onClick={() => onAction("choose_winner", { cardId: entry.cardId })}
           >
-            {entry.text}
+            {caption({ id: entry.cardId, text: entry.text }).text}
           </button>
         ))}
       </div>
@@ -133,7 +133,7 @@ function RoundWon({ session, pending, onAction }: {
   pending: boolean;
   onAction: Action;
 }) {
-  const { t } = useI18n();
+  const { caption, t } = useI18n();
   const won = session.lastRound;
   const winning = session.reveal.find((entry) => entry.cardId === won?.winningCardId);
   const viewerWon = won?.winnerId === session.viewerId;
@@ -141,14 +141,18 @@ function RoundWon({ session, pending, onAction }: {
     <div className="caption-round-result">
       <p className="eyebrow">{t("Round {round}", { round: session.roundNumber })}</p>
       <h2>{viewerWon ? t("Your caption won.") : t("{name} wins the round.", { name: nameOf(session, won?.winnerId) })}</h2>
-      {winning && <article className="points-card"><p className="points-question">{winning.text}</p></article>}
+      {winning && (
+        <article className="points-card">
+          <p className="points-question">{caption({ id: winning.cardId, text: winning.text }).text}</p>
+        </article>
+      )}
       <div className="caption-reveal-list is-resolved">
         {session.reveal
           .filter((entry) => entry.cardId !== won?.winningCardId)
           .map((entry) => (
             <p className="caption-card is-static" key={entry.cardId}>
               <span className="caption-author">{nameOf(session, entry.playerId)}</span>
-              {entry.text}
+              {caption({ id: entry.cardId, text: entry.text }).text}
             </p>
           ))}
       </div>

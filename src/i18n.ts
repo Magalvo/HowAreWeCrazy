@@ -607,6 +607,81 @@ const REWARD_PT: Record<string, string> = {
   "question-08": "O que aprendeste sobre ligação que queres trazer para a nossa relação?"
 };
 
+
+/**
+ * Caption cards in Portuguese.
+ *
+ * These are adaptations rather than translations: several of the English lines rest on
+ * idiom that does not carry, and a few would force a gender in Portuguese that the
+ * English leaves open, so those are rewritten to stay neutral.
+ */
+const CAPTION_PT: Record<string, string> = {
+  "cap-001": "Eu, a explicar o enredo de um filme que não vi.",
+  "cap-002": "O grupo, quatro segundos depois de alguém dizer \"pergunta rápida\".",
+  "cap-003": "A app do banco, a abrir no pior momento possível.",
+  "cap-004": "Acordar com a certeza de que é sábado. É terça.",
+  "cap-005": "A cara de quem acabou de dizer \"com toda a honestidade\".",
+  "cap-006": "Eu a fingir que a receita pedia mesmo aquela manteiga toda.",
+  "cap-007": "Terceira hora de uma reunião marcada para quinze minutos.",
+  "cap-008": "Quando tocam à campainha e ninguém está à espera de ninguém.",
+  "cap-009": "O meu browser, com noventa separadores e nenhuma resposta.",
+  "cap-010": "O momento exato em que o grupo percebe que ninguém reservou nada.",
+  "cap-011": "Eu, a aceitar planos que são daqui a três semanas.",
+  "cap-012": "Eu, na manhã desses planos.",
+  "cap-013": "A confiança de quem leu um artigo.",
+  "cap-014": "Mandar um áudio mais longo do que o filme que estamos a discutir.",
+  "cap-015": "Quando o empregado diz \"bom apetite\" e tu respondes \"igualmente\".",
+  "cap-016": "A minha postura, hora e meia a trabalhar da cama.",
+  "cap-017": "Toda a gente a acenar que sim a um plano que ninguém percebeu.",
+  "cap-018": "A pessoa que sugere mais uma à meia-noite.",
+  "cap-019": "Eu, ao terceiro café, a descobrir que afinal sempre tive uma opinião forte.",
+  "cap-020": "Ler uma mensagem e decidir que amanhã é melhor dia para aquilo.",
+  "cap-021": "Aquele silêncio específico depois de uma piada correr mal.",
+  "cap-022": "Perceber a meio da frase que já contaste esta história.",
+  "cap-023": "Perceber a meio da frase que a contaste a esta pessoa exata.",
+  "cap-024": "Os meus planos de fim de semana, contra um sofá com opinião.",
+  "cap-025": "Chegar cedo e recusar ser a primeira pessoa a entrar.",
+  "cap-026": "A cara de quem diz que não liga nada a ganhar.",
+  "cap-027": "Quando tiram a foto de grupo e tu estavas a meio de um piscar de olhos.",
+  "cap-028": "Montar móveis com três peças a sobrar e confiança total.",
+  "cap-029": "O meu histórico de pesquisas, a defender-se em tribunal.",
+  "cap-030": "A pessoa que já decidiu o que toda a gente vai pedir.",
+  "cap-031": "Ouvir a tua própria voz gravada pela primeira vez.",
+  "cap-032": "Quando a app atualiza e muda todos os botões de propósito.",
+  "cap-033": "Acenar que sim a indicações que deixei de seguir na rotunda.",
+  "cap-034": "Eu, a prometer que este é o último episódio.",
+  "cap-035": "A inscrição no ginásio, a olhar para mim do outro lado da sala.",
+  "cap-036": "O tio de alguém, a descobrir uma discussão ao jantar.",
+  "cap-037": "Tentar sair de uma festa sem desencadear uma segunda festa.",
+  "cap-038": "A cara exata de \"não faço ideia do que acabou de acontecer\".",
+  "cap-039": "Quando te ris no momento errado de uma conversa séria.",
+  "cap-040": "As minhas plantas, a apresentar queixa formal.",
+  "cap-041": "Ver outra pessoa a usar mal o computador.",
+  "cap-042": "A primeira manhã fria, e toda a gente a agir como se tivesse sido traída.",
+  "cap-043": "Eu, a explicar porque preciso de um quarto cabo de carregar.",
+  "cap-044": "Abrir o frigorífico outra vez, à espera de resultados diferentes.",
+  "cap-045": "Quando se despedem e depois seguem os dois na mesma direção.",
+  "cap-046": "A pessoa que fotografa tudo antes de alguém comer.",
+  "cap-047": "Entrar com confiança na sala errada e ficar.",
+  "cap-048": "O meu despertador, a negociar comigo de má-fé.",
+  "cap-049": "Quando alguém diz o teu nome e tu não estavas a ouvir.",
+  "cap-050": "A última fatia, e quatro pessoas extremamente educadas.",
+  "cap-051": "Fingir que percebi o que o mecânico me acabou de dizer.",
+  "cap-052": "Aquela pessoa, a recontar a noite melhor do que ela foi.",
+  "cap-053": "Eu, em espera ao telefone, a ver a minha simpatia a evaporar.",
+  "cap-054": "Quando o grupo começa a planear e alguém abre uma folha de cálculo.",
+  "cap-055": "O olhar trocado quando o anfitrião diz \"temos jogos\".",
+  "cap-056": "Decidir às duas da manhã reorganizar a minha vida inteira.",
+  "cap-057": "Essa decisão, às nove da manhã.",
+  "cap-058": "Quando a fila anda e tens de voltar a ser uma pessoa.",
+  "cap-059": "A olhar para o rastreio da encomenda como se me devesse dinheiro.",
+  "cap-060": "A pessoa que tem sempre frio, faça o tempo que fizer, onde quer que seja.",
+  "cap-061": "Eu, a aceitar segurar uma coisa só por um segundo.",
+  "cap-062": "Vinte minutos depois, ainda a segurar.",
+  "cap-063": "Quando acabas uma tarefa e precisas logo de contar a alguém.",
+  "cap-064": "A energia exata de um domingo às quatro da tarde."
+};
+
 export function format(template: string, values: Record<string, string | number> = {}) {
   return Object.entries(values).reduce(
     (copy, [key, value]) => copy.replaceAll(`{${key}}`, String(value)),
@@ -637,6 +712,16 @@ export function translateTag(tag: string, language: Language) {
   return language === "pt-PT" ? TAG_PT[tag] || tag : tag;
 }
 
+export function localizeCaption<T extends { id: string; text: string }>(card: T, language: Language): T {
+  return language === "pt-PT" && CAPTION_PT[card.id]
+    ? { ...card, text: CAPTION_PT[card.id] }
+    : card;
+}
+
+export function hasCaptionTranslation(id: string, language: Language) {
+  return language !== "pt-PT" || Boolean(CAPTION_PT[id]);
+}
+
 export function localizeReward<T extends { id: string; text: string }>(reward: T, language: Language): T {
   return language === "pt-PT" && REWARD_PT[reward.id]
     ? { ...reward, text: REWARD_PT[reward.id] }
@@ -650,6 +735,7 @@ export function createI18n(language: Language) {
     level: (level: Level) => localizeLevel(level, language),
     prompt: (prompt: Prompt) => localizePrompt(prompt, language),
     tag: (tag: string) => translateTag(tag, language),
+    caption: <T extends { id: string; text: string }>(card: T) => localizeCaption(card, language),
     reward: <T extends { id: string; text: string }>(reward: T) => localizeReward(reward, language)
   };
 }
