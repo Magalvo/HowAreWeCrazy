@@ -116,7 +116,21 @@ export function App() {
   useEffect(() => {
     const theme = caption?.mode || adaptive?.mode ||
       (screen === "setup" && setup.playMode !== "join" ? normalizeExperience(setup.roomMode) : "conversation");
+    if (document.body.dataset.experience === theme) {
+      return;
+    }
+    // A theme swap rewrites every colour token at once. Elements mid-transition on a
+    // property fed by one of those tokens can keep the old value rather than move to the
+    // new one, so transitions are held off for the frame the swap lands on.
+    const root = document.documentElement;
+    root.classList.add("theme-switching");
     document.body.dataset.experience = theme;
+    void root.offsetHeight;
+    const frame = window.requestAnimationFrame(() => root.classList.remove("theme-switching"));
+    return () => {
+      window.cancelAnimationFrame(frame);
+      root.classList.remove("theme-switching");
+    };
   }, [adaptive?.mode, caption?.mode, screen, setup.playMode, setup.roomMode]);
 
   useEffect(() => {

@@ -19,6 +19,19 @@
   box-sizing: border-box;
 }
 
+/*
+ * Swapping themes rewrites the custom properties every colour is built from. Any element
+ * transitioning a property fed by one of those tokens can be left holding the old value
+ * instead of animating to the new one, which in the dark themes means light text on a
+ * light background. Transitions are suppressed for the single frame of the swap.
+ */
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+}
+
+
 body {
   min-height: 100vh;
   margin: 0;
@@ -26,7 +39,6 @@ body {
   background:
     radial-gradient(circle at top right, rgba(171, 78, 50, 0.09), transparent 32rem),
     var(--background);
-  transition: background-color 240ms ease, color 240ms ease;
 }
 
 body[data-experience="date_night"] {
@@ -35,12 +47,16 @@ body[data-experience="date_night"] {
   --surface-strong: #ffffff;
   --ink: #321e20;
   --muted: #725959;
-  --accent: #e57373;
+  /* Deepened from #e57373, which fell just under the 3:1 that selected-control
+     borders need against this theme's near-white surfaces. */
+  --accent: #df6a6a;
   --accent-dark: #80272b;
   --accent-soft: #ffdad8;
   --border: rgba(160, 62, 64, 0.16);
   --shadow: 0 20px 48px rgba(128, 39, 43, 0.08);
   --glow: rgba(229, 115, 115, 0.18);
+  /* The accent is too light to carry white text at 4.5:1, so the label goes dark. */
+  --on-accent: #2a1214;
   background:
     radial-gradient(circle at 90% 8%, rgba(229, 115, 115, 0.16), transparent 25rem),
     var(--background);
@@ -71,12 +87,16 @@ body[data-experience="icebreaker"] {
   --surface-strong: #ffffff;
   --ink: #283143;
   --muted: #5d6374;
-  --accent: #d37a45;
+  /* Deepened from #d37a45, which fell just under the 3:1 that selected-control
+     borders need against this theme's page background. */
+  --accent: #cd7440;
   --accent-dark: #944520;
   --accent-soft: #ffe3ca;
   --border: rgba(178, 187, 255, 0.42);
   --shadow: 0 20px 45px rgba(83, 87, 132, 0.1);
   --glow: rgba(255, 179, 133, 0.24);
+  /* Same as A Table 4 Two: white on this orange only reaches 3.2:1. */
+  --on-accent: #1f1608;
   background:
     radial-gradient(circle at 88% 6%, rgba(255, 179, 133, 0.24), transparent 26rem),
     radial-gradient(circle at 6% 74%, rgba(178, 187, 255, 0.2), transparent 24rem),
@@ -262,7 +282,7 @@ button:disabled {
 }
 
 .eyebrow {
-  color: var(--accent);
+  color: var(--accent-dark);
   font-size: 0.73rem;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -537,7 +557,7 @@ small {
 
 .mode-choice:has(input:checked) span {
   background: var(--accent);
-  color: white;
+  color: var(--on-accent);
 }
 
 .choice {
@@ -551,6 +571,13 @@ small {
 .choice:has(input:checked) {
   background: var(--accent-soft);
   border-color: var(--accent);
+}
+
+/* The tinted background a selected card gains is too close to the muted grey the
+   description is written in, so the description firms up to full ink while selected. */
+.choice:has(input:checked) .choice-copy,
+.rule-choice:has(input:checked) .choice-copy {
+  color: var(--ink);
 }
 
 .choice input {
@@ -677,7 +704,7 @@ small {
 .saved-count {
   background: var(--accent);
   border-radius: 99px;
-  color: white;
+  color: var(--on-accent);
   display: inline-flex;
   font-size: 0.78rem;
   justify-content: center;
@@ -830,7 +857,7 @@ small {
 }
 
 .participant-chip.is-offline {
-  background: #e5ded6;
+  background: var(--surface-strong);
   color: var(--muted);
 }
 
@@ -1059,7 +1086,7 @@ small {
 }
 
 .level-button strong {
-  color: var(--accent);
+  color: var(--accent-dark);
   font-size: 1.4rem;
 }
 
@@ -1168,7 +1195,7 @@ small {
 }
 
 .target-button.is-cooling {
-  background: #e5ded6;
+  background: var(--surface-strong);
   color: var(--muted);
 }
 
@@ -1335,7 +1362,7 @@ small {
 
 .card-level {
   align-self: flex-start;
-  color: var(--accent);
+  color: var(--accent-dark);
   font-size: 0.82rem;
   font-weight: 650;
 }
@@ -1464,10 +1491,12 @@ small {
 }
 
 .toast {
+  /* Inverted against the page: ink behind, page colour in front. A fixed white would
+     vanish in the dark themes, where ink is the near-white end of the palette. */
   background: var(--ink);
   border-radius: 999px;
   bottom: calc(20px + env(safe-area-inset-bottom));
-  color: white;
+  color: var(--background);
   left: 50%;
   padding: 12px 20px;
   position: fixed;
@@ -1745,6 +1774,10 @@ body[data-experience="caption"] {
   --glow: rgba(245, 196, 81, 0.18);
   --on-accent: #10131c;
   color-scheme: dark;
+  background:
+    radial-gradient(circle at top right, rgba(245, 196, 81, 0.14), transparent 30rem),
+    radial-gradient(circle at bottom left, rgba(84, 106, 168, 0.18), transparent 28rem),
+    var(--background);
 }
 
 .meme-stage {
@@ -1832,7 +1865,7 @@ body[data-experience="caption"] {
 .caption-author {
   display: block;
   margin-bottom: 4px;
-  color: var(--accent);
+  color: var(--accent-dark);
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1845,7 +1878,7 @@ body[data-experience="caption"] {
 
 .participant-chip.is-ready {
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-dark);
 }
 
 @media (min-width: 720px) {
