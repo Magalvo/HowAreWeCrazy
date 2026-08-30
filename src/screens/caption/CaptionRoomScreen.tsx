@@ -1,6 +1,6 @@
 import { useI18n } from "../../i18n-context";
 import type { CaptionPlayer, CaptionSession } from "../../types";
-import { MemeStage } from "./MemeStage";
+import { PlayableCardFace } from "./PlayableCardFace";
 
 type Action = (action: string, payload?: Record<string, unknown>) => void;
 
@@ -37,17 +37,25 @@ function Lobby({ session, pending, onAction }: {
   onAction: Action;
 }) {
   const { t } = useI18n();
-  const needed = Math.max(0, 3 - session.players.length);
+  const needed = Math.max(0, session.minPlayers - session.players.length);
   return (
     <div className="points-lobby">
       <p className="eyebrow">{t("Lobby")}</p>
-      <h2>{t("Everyone captions. One of you judges.")}</h2>
+      <h2>{session.judged ? t("Everyone plays. One of you judges.") : t("Just the two of you. Nobody judges.")}</h2>
       <p className="lede">
         {needed > 0
           ? t("Waiting for {count} more before you begin.", { count: needed })
           : t("{count} players are in. The host can begin.", { count: session.players.length })}
       </p>
-      <p className="safety-note">{t("Each round the judge picks the caption that fits best. First to {target} points wins.", { target: session.scoreTarget })}</p>
+      <p className="safety-note">
+        {session.promptKind === "image"
+          ? t("An image goes on the table and you answer it with a caption.")
+          : t("A caption goes on the table and you answer it with an image.")}
+        {" "}
+        {session.judged
+          ? t("The judge picks the best answer. First to {target} points wins.", { target: session.scoreTarget })
+          : t("There is no score. You play until the cards run out.")}
+      </p>
       {session.availableActions.includes("start_match") && (
         <button className="primary-button" disabled={pending} onClick={() => onAction("start_match")}>
           {t("Start the game")}
@@ -62,12 +70,13 @@ function Hand({ session, pending, onAction }: {
   pending: boolean;
   onAction: Action;
 }) {
-  const { caption, t } = useI18n();
+  const { t } = useI18n();
   const mayPlay = session.availableActions.includes("submit_caption");
+  const imageHand = session.promptKind === "caption";
   return (
     <div className="caption-hand">
       <p className="eyebrow">{mayPlay ? t("Your hand") : t("Your hand, this round is played")}</p>
-      <div className="caption-hand-list">
+      <div className={`caption-hand-list${imageHand ? " is-image-hand" : ""}`}>
         {session.hand.map((card) => (
           <button
             className="caption-card"
@@ -76,7 +85,7 @@ function Hand({ session, pending, onAction }: {
             disabled={!mayPlay || pending}
             onClick={() => onAction("submit_caption", { cardId: card.id })}
           >
-            {caption(card).text}
+            <PlayableCardFace card={card} />
           </button>
         ))}
       </div>
@@ -88,13 +97,9 @@ function WaitingOn({ session }: { session: CaptionSession }) {
   const { t } = useI18n();
   const waiting = session.awaitingPlayerIds.map((id) => nameOf(session, id)).filter(Boolean);
   if (waiting.length === 0) {
-    return <p className="points-guidance">{t("Everyone has played. Handing over to the judge.")}</p>;
+    return <p className="points-guidance">{t("Everyone has played.")}</p>;
   }
-  return (
-    <p className="points-guidance">
-      {t("Waiting on {names}.", { names: waiting.join(", ") })}
-    </p>
-  );
+  return <p className="points-guidance">{t("Waiting on {names}.", { names: waiting.join(", ") })}</p>;
 }
 
 function Judging({ session, pending, onAction }: {
@@ -102,16 +107,17 @@ function Judging({ session, pending, onAction }: {
   pending: boolean;
   onAction: Action;
 }) {
-  const { caption, t } = useI18n();
+  const { t } = useI18n();
   const mayJudge = session.availableActions.includes("choose_winner");
+  const imageHand = session.promptKind === "caption";
   return (
     <div className="caption-reveal">
       <p className="points-guidance">
         {mayJudge
-          ? t("You are judging. Pick the caption that fits best.")
+          ? t("You are judging. Pick the answer that fits best.")
           : t("{name} is choosing a winner.", { name: nameOf(session, session.judgeId) })}
       </p>
-      <div className="caption-reveal-list">
+      <div className={`caption-reveal-list${imageHand ? " is-image-hand" : ""}`}>
         {session.reveal.map((entry) => (
           <button
             className="caption-card"
@@ -120,7 +126,7 @@ function Judging({ session, pending, onAction }: {
             disabled={!mayJudge || pending}
             onClick={() => onAction("choose_winner", { cardId: entry.cardId })}
           >
-            {caption({ id: entry.cardId, text: entry.text }).text}
+            <PlayableCardFace card={entry.card} />
           </button>
         ))}
       </div>
@@ -128,35 +134,41 @@ function Judging({ session, pending, onAction }: {
   );
 }
 
-function RoundWon({ session, pending, onAction }: {
+function RoundOver({ session, pending, onAction }: {
   session: CaptionSession;
   pending: boolean;
   onAction: Action;
 }) {
-  const { caption, t } = useI18n();
+  const { t } = useI18n();
   const won = session.lastRound;
   const winning = session.reveal.find((entry) => entry.cardId === won?.winningCardId);
+  const others = session.reveal.filter((entry) => entry.cardId !== won?.winningCardId);
   const viewerWon = won?.winnerId === session.viewerId;
+  const imageHand = session.promptKind === "caption";
   return (
     <div className="caption-round-result">
       <p className="eyebrow">{t("Round {round}", { round: session.roundNumber })}</p>
-      <h2>{viewerWon ? t("Your caption won.") : t("{name} wins the round.", { name: nameOf(session, won?.winnerId) })}</h2>
+      <h2>
+        {!session.judged
+          ? t("Here is what you both played.")
+          : viewerWon
+            ? t("Your card won.")
+            : t("{name} wins the round.", { name: nameOf(session, won?.winnerId) })}
+      </h2>
       {winning && (
         <article className="points-card">
-          <p className="points-question">{caption({ id: winning.cardId, text: winning.text }).text}</p>
+          <PlayableCardFace card={winning.card} size="stage" />
         </article>
       )}
-      <div className="caption-reveal-list is-resolved">
-        {session.reveal
-          .filter((entry) => entry.cardId !== won?.winningCardId)
-          .map((entry) => (
-            <p className="caption-card is-static" key={entry.cardId}>
-              <span className="caption-author">{nameOf(session, entry.playerId)}</span>
-              {caption({ id: entry.cardId, text: entry.text }).text}
-            </p>
-          ))}
+      <div className={`caption-reveal-list is-resolved${imageHand ? " is-image-hand" : ""}`}>
+        {others.map((entry) => (
+          <div className="caption-card is-static" key={entry.cardId}>
+            <span className="caption-author">{nameOf(session, entry.playerId)}</span>
+            <PlayableCardFace card={entry.card} />
+          </div>
+        ))}
       </div>
-      <Scoreboard session={session} />
+      {session.judged && <Scoreboard session={session} />}
       {session.availableActions.includes("next_round") && (
         <button className="primary-button" disabled={pending} onClick={() => onAction("next_round")}>
           {t("Next round")}
@@ -173,16 +185,18 @@ function Results({ session, onLeave }: { session: CaptionSession; onLeave: () =>
     <div className="points-results">
       <p className="eyebrow">{t("Game complete")}</p>
       <h2>
-        {session.winnerIds.length > 1
-          ? t("{winners} tie.", { winners })
-          : t("{winner} wins.", { winner: winners })}
+        {!session.judged
+          ? t("That is the whole deck.")
+          : session.winnerIds.length > 1
+            ? t("{winners} tie.", { winners })
+            : t("{winner} wins.", { winner: winners })}
       </h2>
       <p className="lede">
-        {session.endReason === "images_exhausted"
-          ? t("The images ran out. Highest score takes it.")
+        {session.endReason === "prompts_exhausted"
+          ? t("The cards ran out.")
           : t("First to {target} points.", { target: session.scoreTarget })}
       </p>
-      <Scoreboard session={session} final />
+      {session.judged && <Scoreboard session={session} final />}
       <button className="primary-button" onClick={onLeave}>{t("Leave room")}</button>
     </div>
   );
@@ -237,19 +251,34 @@ export function CaptionRoomScreen({
           <div className="points-status">
             <div>
               <p className="eyebrow">{t("Round {round}", { round: session.roundNumber })}</p>
-              <h2>{session.isJudge ? t("You are the judge") : t("{name} is judging", { name: nameOf(session, session.judgeId) })}</h2>
+              <h2>
+                {!session.judged
+                  ? t("Play your answer")
+                  : session.isJudge
+                    ? t("You are the judge")
+                    : t("{name} is judging", { name: nameOf(session, session.judgeId) })}
+              </h2>
             </div>
-            <p className="score-target">{t("First to {target}", { target: session.scoreTarget })}</p>
+            <p className="score-target">
+              {session.judged ? t("First to {target}", { target: session.scoreTarget }) : t("Just for fun")}
+            </p>
           </div>
 
-          <MemeStage image={session.image} />
+          <article className="prompt-stage">
+            <p className="eyebrow">{session.promptKind === "image" ? t("On the table") : t("Caption on the table")}</p>
+            <PlayableCardFace card={session.prompt} size="stage" />
+          </article>
 
           {session.phase === "submitting" && (
             <>
               {session.isJudge
                 ? <WaitingOn session={session} />
                 : session.availableActions.includes("submit_caption")
-                  ? <p className="points-guidance">{t("Play the caption that fits this image best.")}</p>
+                  ? <p className="points-guidance">
+                      {session.promptKind === "image"
+                        ? t("Play the caption that fits this image best.")
+                        : t("Play the image that fits this caption best.")}
+                    </p>
                   : <WaitingOn session={session} />}
               {!session.isJudge && <Hand session={session} pending={pending} onAction={onAction} />}
             </>
@@ -257,7 +286,7 @@ export function CaptionRoomScreen({
 
           {session.phase === "judging" && <Judging session={session} pending={pending} onAction={onAction} />}
 
-          {session.phase === "round_won" && <RoundWon session={session} pending={pending} onAction={onAction} />}
+          {session.phase === "round_over" && <RoundOver session={session} pending={pending} onAction={onAction} />}
 
           {session.availableActions.includes("skip_stalled_round") && (
             <button className="text-button" disabled={pending} onClick={() => onAction("skip_stalled_round")}>

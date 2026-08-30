@@ -2,10 +2,22 @@ import { CAPTION_CARDS } from "./data/caption-cards.js";
 import { MEME_IMAGES } from "./data/meme-images.js";
 
 export const CAPTION_MODE = "caption";
-export const CAPTION_HAND_SIZE = 7;
 export const CAPTION_SCORE_TARGET = 5;
-export const MIN_CAPTION_PLAYERS = 3;
 export const MAX_CAPTION_PLAYERS = 8;
+
+/**
+ * Which deck goes on the table each round. The other one is dealt into hands.
+ *
+ * `image` is the familiar shape: one image on the table, everyone plays a caption at it.
+ * `caption` turns the round around, and hands hold images instead. The engine treats the
+ * two decks symmetrically, so this is a choice about which feeds what rather than a
+ * second set of rules.
+ */
+export const PROMPT_KINDS = ["image", "caption"];
+
+// An image hand is far heavier than a text one: every card is a separate request to a
+// third-party host, on every player's phone, every round. Fewer cards, same table.
+const HAND_SIZE_BY_KIND = { image: 7, caption: 5 };
 
 function fail(message, statusCode = 400) {
   const error = new Error(message);
@@ -44,7 +56,16 @@ function requirePlaying(match) {
   }
 }
 
-/** Everyone who owes a caption this round: connected, holding cards, and not judging. */
+/** Judged games need someone to play to; free play only needs someone to play with. */
+export function minCaptionPlayers(judged) {
+  return judged ? 3 : 2;
+}
+
+export function captionHandSize(promptKind) {
+  return HAND_SIZE_BY_KIND[promptKind] ?? HAND_SIZE_BY_KIND.image;
+}
+
+/** Everyone who still owes a card: connected, holding cards, and not judging. */
 function pendingSubmitters(match) {
   return match.players.filter((item) =>
     item.id !== match.judgeId &&
@@ -53,19 +74,19 @@ function pendingSubmitters(match) {
     !match.submissions.some((entry) => entry.playerId === item.id));
 }
 
-function drawCaption(next, random) {
-  if (next.captionDeck.length === 0) {
+function drawHandCard(next, random) {
+  if (next.handDeck.length === 0) {
     // Played cards come back so a long game does not run itself dry.
-    next.captionDeck = shuffle(next.captionDiscard, random);
-    next.captionDiscard = [];
+    next.handDeck = shuffle(next.handDiscard, random);
+    next.handDiscard = [];
   }
-  return next.captionDeck.shift();
+  return next.handDeck.shift();
 }
 
 function refillHands(next, random) {
   next.players.forEach((item) => {
     while (item.hand.length < next.handSize) {
-      const card = drawCaption(next, random);
+      const card = drawHandCard(next, random);
       if (!card) {
         return;
       }
@@ -79,7 +100,9 @@ function finish(next, reason) {
   next.phase = null;
   next.endReason = reason;
   const best = Math.max(0, ...next.players.map((item) => item.score));
-  next.winnerIds = best > 0 ? next.players.filter((item) => item.score === best).map((item) => item.id) : [];
+  next.winnerIds = next.judged && best > 0
+    ? next.players.filter((item) => item.score === best).map((item) => item.id)
+    : [];
   return next;
 }
 
@@ -96,15 +119,15 @@ function nextJudgeId(match) {
 }
 
 function beginRound(next, random, { rotate = true } = {}) {
-  if (rotate) {
+  if (rotate && next.judged) {
     next.judgeId = nextJudgeId(next);
   }
   refillHands(next, random);
-  const imageId = next.imageDeck.shift();
-  if (!imageId) {
-    return finish(next, "images_exhausted");
+  const promptId = next.promptDeck.shift();
+  if (!promptId) {
+    return finish(next, "prompts_exhausted");
   }
-  next.currentImageId = imageId;
+  next.currentPromptId = promptId;
   next.submissions = [];
   next.reveal = [];
   next.roundNumber += 1;
@@ -112,7 +135,12 @@ function beginRound(next, random, { rotate = true } = {}) {
   return next;
 }
 
-/** Judging can only start once nobody is still owed a turn, and something was played. */
+/**
+ * Closes the round once nobody is still owed a turn.
+ *
+ * A judged game hands over to the judge with the plays anonymous. Free play has nobody to
+ * decide, so it goes straight to showing everyone what everyone played.
+ */
 function closeSubmissionsIfReady(next, random) {
   if (next.phase !== "submitting" || pendingSubmitters(next).length > 0) {
     return next;
@@ -124,15 +152,23 @@ function closeSubmissionsIfReady(next, random) {
     cardId: entry.cardId,
     playerId: entry.playerId
   }));
-  next.phase = "judging";
+  if (next.judged) {
+    next.phase = "judging";
+    return next;
+  }
+  next.handDiscard.push(...next.submissions.map((entry) => entry.cardId));
+  next.lastRound = null;
+  next.phase = "round_over";
   return next;
 }
 
 export function createCaptionMatch({
   participants,
   random = Math.random,
+  promptKind = "image",
+  judged = true,
   scoreTarget = CAPTION_SCORE_TARGET,
-  handSize = CAPTION_HAND_SIZE,
+  handSize,
   captionCards = CAPTION_CARDS,
   memeImages = MEME_IMAGES
 } = {}) {
@@ -142,14 +178,23 @@ export function createCaptionMatch({
   if (participants.length > MAX_CAPTION_PLAYERS) {
     fail("This room is full.");
   }
+  if (!PROMPT_KINDS.includes(promptKind)) {
+    fail("Unknown round direction.");
+  }
   const players = participants.map((participant) => ({
     ...participant,
     connected: true,
     score: 0,
     hand: []
   }));
+  const imageIds = memeImages.map((image) => image.id);
+  const captionIds = captionCards.map((card) => card.id);
+  const onTable = promptKind === "image" ? imageIds : captionIds;
+  const inHand = promptKind === "image" ? captionIds : imageIds;
   return {
     mode: CAPTION_MODE,
+    promptKind,
+    judged,
     status: "lobby",
     phase: null,
     players,
@@ -157,11 +202,11 @@ export function createCaptionMatch({
     judgeId: null,
     roundNumber: 0,
     scoreTarget,
-    handSize,
-    captionDeck: shuffle(captionCards.map((card) => card.id), random),
-    captionDiscard: [],
-    imageDeck: shuffle(memeImages.map((image) => image.id), random),
-    currentImageId: null,
+    handSize: handSize ?? captionHandSize(promptKind),
+    handDeck: shuffle(inHand, random),
+    handDiscard: [],
+    promptDeck: shuffle(onTable, random),
+    currentPromptId: null,
     submissions: [],
     reveal: [],
     lastRound: null,
@@ -202,25 +247,26 @@ function startMatch(next, actorId, random) {
   if (next.status !== "lobby") {
     fail("This game has already started.");
   }
-  if (next.players.length < MIN_CAPTION_PLAYERS) {
-    fail(`This game needs at least ${MIN_CAPTION_PLAYERS} players.`);
+  const needed = minCaptionPlayers(next.judged);
+  if (next.players.length < needed) {
+    fail(`This game needs at least ${needed} players.`);
   }
   next.status = "playing";
-  next.judgeId = next.turnOrder[0];
+  next.judgeId = next.judged ? next.turnOrder[0] : null;
   return beginRound(next, random, { rotate: false });
 }
 
-function submitCaption(next, actorId, payload, random) {
+function submitCard(next, actorId, payload, random) {
   requirePlaying(next);
   const actor = requirePlayer(next, actorId);
   if (next.phase !== "submitting") {
     fail("Submissions are closed for this round.");
   }
-  if (actorId === next.judgeId) {
-    fail("The judge does not play a caption this round.");
+  if (next.judged && actorId === next.judgeId) {
+    fail("The judge does not play a card this round.");
   }
   if (next.submissions.some((entry) => entry.playerId === actorId)) {
-    fail("You have already played a caption this round.");
+    fail("You have already played a card this round.");
   }
   const cardId = payload.cardId;
   if (!actor.hand.includes(cardId)) {
@@ -234,36 +280,39 @@ function submitCaption(next, actorId, payload, random) {
 function chooseWinner(next, actorId, payload) {
   requirePlaying(next);
   requirePlayer(next, actorId);
+  if (!next.judged) {
+    fail("This game has no judge.");
+  }
   if (next.phase !== "judging") {
     fail("There is nothing to judge yet.");
   }
   if (actorId !== next.judgeId) {
-    fail("Only the judge picks the winning caption.", 403);
+    fail("Only the judge picks the winning card.", 403);
   }
   const winning = next.reveal.find((entry) => entry.cardId === payload.cardId);
   if (!winning) {
-    fail("That caption was not played this round.");
+    fail("That card was not played this round.");
   }
   const winner = player(next, winning.playerId);
   winner.score += 1;
   next.lastRound = {
-    imageId: next.currentImageId,
+    promptId: next.currentPromptId,
     winnerId: winner.id,
     winningCardId: winning.cardId,
     judgeId: next.judgeId
   };
-  next.captionDiscard.push(...next.submissions.map((entry) => entry.cardId));
-  next.phase = "round_won";
+  next.handDiscard.push(...next.submissions.map((entry) => entry.cardId));
+  next.phase = "round_over";
   return next;
 }
 
 function startNextRound(next, actorId, random) {
   requirePlaying(next);
   requirePlayer(next, actorId);
-  if (next.phase !== "round_won") {
+  if (next.phase !== "round_over") {
     fail("This round is still in play.");
   }
-  if (next.players.some((item) => item.score >= next.scoreTarget)) {
+  if (next.judged && next.players.some((item) => item.score >= next.scoreTarget)) {
     return finish(next, "score_target");
   }
   return beginRound(next, random);
@@ -275,7 +324,7 @@ function skipStalledRound(next, actorId, random) {
   if (actor.role !== "host" || !canHostSkipCaptionRound(next, actorId)) {
     fail("There is nothing stalled to skip.", 403);
   }
-  next.captionDiscard.push(...next.submissions.map((entry) => entry.cardId));
+  next.handDiscard.push(...next.submissions.map((entry) => entry.cardId));
   next.lastRound = null;
   return beginRound(next, random);
 }
@@ -286,7 +335,7 @@ export function performCaptionAction(match, actorId, action, payload = {}, rando
     return startMatch(next, actorId, random);
   }
   if (action === "submit_caption") {
-    return submitCaption(next, actorId, payload, random);
+    return submitCard(next, actorId, payload, random);
   }
   if (action === "choose_winner") {
     return chooseWinner(next, actorId, payload);
@@ -305,7 +354,7 @@ export function canHostSkipCaptionRound(match, viewerId) {
   if (match.status !== "playing" || player(match, viewerId)?.role !== "host") {
     return false;
   }
-  if (match.phase === "judging" || match.phase === "round_won") {
+  if (match.judged && (match.phase === "judging" || match.phase === "round_over")) {
     return !player(match, match.judgeId)?.connected;
   }
   if (match.phase === "submitting") {
@@ -320,7 +369,8 @@ function actionsFor(match, viewerId, canSkip) {
     return [];
   }
   if (match.status === "lobby") {
-    return actor.role === "host" && match.players.length >= MIN_CAPTION_PLAYERS ? ["start_match"] : [];
+    const ready = match.players.length >= minCaptionPlayers(match.judged);
+    return actor.role === "host" && ready ? ["start_match"] : [];
   }
   if (match.status !== "playing") {
     return [];
@@ -330,15 +380,15 @@ function actionsFor(match, viewerId, canSkip) {
     actions.push("skip_stalled_round");
   }
   if (match.phase === "submitting" &&
-    viewerId !== match.judgeId &&
+    !(match.judged && viewerId === match.judgeId) &&
     !match.submissions.some((entry) => entry.playerId === viewerId) &&
     actor.hand.length > 0) {
     actions.push("submit_caption");
   }
-  if (match.phase === "judging" && viewerId === match.judgeId) {
+  if (match.judged && match.phase === "judging" && viewerId === match.judgeId) {
     actions.push("choose_winner");
   }
-  if (match.phase === "round_won") {
+  if (match.phase === "round_over") {
     actions.push("next_round");
   }
   return actions;
@@ -347,9 +397,10 @@ function actionsFor(match, viewerId, canSkip) {
 /**
  * The snapshot one player is allowed to see.
  *
- * Three things never leave this function: another player's hand, who played which caption
- * while the judge is deciding, and the decks. Judging is deliberately anonymous, so the
- * authors of the played captions only appear once the round has been won.
+ * Three things never leave this function: another player's hand, who played which card
+ * while a judge is deciding, and the decks. Judging is deliberately anonymous, so authors
+ * appear only once the round is over - which in free play is immediately, since there is
+ * nobody whose opinion the anonymity was protecting.
  */
 export function captionView(match, viewerId, {
   canSkip = false,
@@ -357,20 +408,26 @@ export function captionView(match, viewerId, {
   memeImages = MEME_IMAGES
 } = {}) {
   const viewer = player(match, viewerId);
-  const judged = match.phase === "round_won" || match.status === "finished";
-  // The match holds card ids only, so the deck it was dealt from has to come back in
-  // here. Anything that swaps the card source has to swap it in both places.
+  const authorsVisible = match.phase === "round_over" || match.status === "finished";
+  // The match holds card ids only, so the decks it was dealt from have to come back in
+  // here. Anything that swaps a card source has to swap it in both places.
   const captionById = new Map(captionCards.map((card) => [card.id, card]));
   const imageById = new Map(memeImages.map((image) => [image.id, image]));
+  const promptById = match.promptKind === "image" ? imageById : captionById;
+  const handById = match.promptKind === "image" ? captionById : imageById;
+
   return {
     mode: match.mode,
+    promptKind: match.promptKind,
+    judged: match.judged,
     status: match.status,
     phase: match.phase,
     roundNumber: match.roundNumber,
     scoreTarget: match.scoreTarget,
+    minPlayers: minCaptionPlayers(match.judged),
     judgeId: match.judgeId,
     viewerId,
-    isJudge: viewerId === match.judgeId,
+    isJudge: match.judged && viewerId === match.judgeId,
     players: match.players.map((item) => ({
       id: item.id,
       name: item.name,
@@ -379,26 +436,26 @@ export function captionView(match, viewerId, {
       score: item.score,
       handCount: item.hand.length
     })),
-    hand: (viewer?.hand || []).map((cardId) => captionById.get(cardId)).filter(Boolean),
-    image: match.currentImageId ? imageById.get(match.currentImageId) || null : null,
+    hand: (viewer?.hand || []).map((cardId) => handById.get(cardId)).filter(Boolean),
+    prompt: match.currentPromptId ? promptById.get(match.currentPromptId) || null : null,
     submittedPlayerIds: match.phase === "submitting"
       ? match.submissions.map((entry) => entry.playerId)
       : [],
     awaitingPlayerIds: match.phase === "submitting"
       ? pendingSubmitters(match).map((item) => item.id)
       : [],
-    reveal: ["judging", "round_won"].includes(match.phase)
+    reveal: ["judging", "round_over"].includes(match.phase)
       ? match.reveal.map((entry) => ({
           cardId: entry.cardId,
-          text: captionById.get(entry.cardId)?.text,
-          ...(judged ? { playerId: entry.playerId } : {})
+          card: handById.get(entry.cardId) || null,
+          ...(authorsVisible ? { playerId: entry.playerId } : {})
         }))
       : [],
     lastRound: match.lastRound,
     winnerIds: match.winnerIds,
     endReason: match.endReason,
-    captionsRemaining: match.captionDeck.length + match.captionDiscard.length,
-    imagesRemaining: match.imageDeck.length,
+    handCardsRemaining: match.handDeck.length + match.handDiscard.length,
+    promptsRemaining: match.promptDeck.length,
     availableActions: actionsFor(match, viewerId, canSkip)
   };
 }

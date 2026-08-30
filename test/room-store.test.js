@@ -178,6 +178,45 @@ test("a caption room seats up to eight players and keeps each hand private", () 
   assert.equal(sara.room.session.captionDeck, undefined);
 });
 
+test("a caption room can be opened reversed, with images in hand", () => {
+  const store = createFixedStore();
+  const host = store.createRoom({ mode: "caption", hostName: "Ana", promptKind: "caption" });
+  store.joinRoom("PLAY5", "Rui");
+  store.joinRoom("PLAY5", "Sara");
+
+  store.act("PLAY5", host.participantToken, "start_match");
+
+  const view = store.getRoom("PLAY5", host.participantToken).session;
+  assert.equal(view.promptKind, "caption");
+  assert.ok(view.prompt.text.length > 0);
+  assert.equal(view.hand.length, 5);
+  assert.ok(view.hand.every((card) => card.url.startsWith("https://")));
+});
+
+test("a judgeless caption room starts with a pair and never seats a judge", () => {
+  const store = createFixedStore();
+  const host = store.createRoom({ mode: "caption", hostName: "Ana", judged: false });
+  const rui = store.joinRoom("PLAY5", "Rui");
+
+  store.act("PLAY5", host.participantToken, "start_match");
+
+  const hostView = store.getRoom("PLAY5", host.participantToken).session;
+  assert.equal(hostView.judged, false);
+  assert.equal(hostView.judgeId, null);
+  assert.equal(hostView.minPlayers, 2);
+  assert.ok(hostView.availableActions.includes("submit_caption"));
+
+  const hostHand = hostView.hand;
+  const ruiHand = store.getRoom("PLAY5", rui.participantToken).session.hand;
+  store.act("PLAY5", host.participantToken, "submit_caption", { cardId: hostHand[0].id });
+  store.act("PLAY5", rui.participantToken, "submit_caption", { cardId: ruiHand[0].id });
+
+  const settled = store.getRoom("PLAY5", rui.participantToken).session;
+  assert.equal(settled.phase, "round_over");
+  assert.ok(settled.reveal.every((entry) => entry.playerId !== undefined));
+  assert.ok(settled.players.every((item) => item.score === 0));
+});
+
 test("a caption room refuses late joins and unknown participants", () => {
   const store = createFixedStore();
   const host = store.createRoom({ mode: "caption" });

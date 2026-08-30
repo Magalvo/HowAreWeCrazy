@@ -16,7 +16,17 @@ const ROOM_EXPERIENCES = [
   ["date_night", "2 players | Shared goal", "A Table 4 Two", "Build a connection milestone together."],
   ["inner_circle", "3-6 friends | Points", "Inner Circle", "Playfully compete with balanced targeting."],
   ["icebreaker", "3-6 players | Shared goal", "Icebreaker", "Meet the room through fair roulette."],
-  ["caption", "3-8 players | Points", "Caption Clash", "Everyone captions the image. The judge picks the winner."]
+  ["caption", "2-8 players | Your rules", "Caption Clash", "Match images to captions, judged or just for fun."]
+] as const;
+
+const CAPTION_DIRECTIONS = [
+  ["image", "Caption the image", "An image goes on the table. Everyone answers with a caption card."],
+  ["caption", "Match the caption", "A caption goes on the table. Everyone answers with an image card."]
+] as const;
+
+const CAPTION_FORMATS = [
+  ["judged", "With a judge", "3-8 players. A rotating judge picks the best answer and scores it."],
+  ["free", "Just for fun", "From 2 players. Nobody judges, nothing is scored, you just show each other."]
 ] as const;
 
 const DATE_VARIANTS = [
@@ -64,7 +74,9 @@ export function SetupScreen({
       : "Work together toward a shared milestone, then choose a closing moment.",
     inner_circle: "Private draws and points stay playful through balanced target cooldowns.",
     icebreaker: "A fair spin chooses responders while everyone builds group progress.",
-    caption: "A rotating judge picks the caption that fits the image best. Images load from the internet."
+    caption: setup.captionJudged
+      ? "A rotating judge picks the best answer each round. Images load from the internet."
+      : "Nobody judges and nothing is scored. Images load from the internet."
   }[setup.roomMode];
   const startText = adaptive
     ? setup.playMode === "host"
@@ -159,6 +171,42 @@ export function SetupScreen({
                 ))}
               </div>
               <p className="experience-helper">{t(helper)}</p>
+            </fieldset>
+          )}
+          {setup.playMode === "host" && setup.roomMode === "caption" && (
+            <fieldset className="date-variant-panel">
+              <legend>{t("Which way round?")}</legend>
+              <div className="rule-grid compact">
+                {CAPTION_DIRECTIONS.map(([value, title, copy]) => (
+                  <label className="rule-choice" key={value}>
+                    <input
+                      type="radio"
+                      checked={setup.captionPromptKind === value}
+                      onChange={() => onChange({ captionPromptKind: value })}
+                    />
+                    <span className="choice-title">{t(title)}</span>
+                    <span className="choice-copy">{t(copy)}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+          {setup.playMode === "host" && setup.roomMode === "caption" && (
+            <fieldset className="date-variant-panel">
+              <legend>{t("How are you keeping score?")}</legend>
+              <div className="rule-grid compact">
+                {CAPTION_FORMATS.map(([value, title, copy]) => (
+                  <label className="rule-choice" key={value}>
+                    <input
+                      type="radio"
+                      checked={setup.captionJudged === (value === "judged")}
+                      onChange={() => onChange({ captionJudged: value === "judged" })}
+                    />
+                    <span className="choice-title">{t(title)}</span>
+                    <span className="choice-copy">{t(copy)}</span>
+                  </label>
+                ))}
+              </div>
             </fieldset>
           )}
           {showDateNightPanels && (

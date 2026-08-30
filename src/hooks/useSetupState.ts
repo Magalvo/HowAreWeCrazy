@@ -19,7 +19,9 @@ function initialSetup(invitedCode: string): SetupState {
     agreement: false,
     joinCode: invitedCode,
     joinName: "",
-    joinAgreement: false
+    joinAgreement: false,
+    captionPromptKind: "image",
+    captionJudged: true
   };
 }
 

@@ -23,8 +23,11 @@ list at the end of this file.
 - `A Table 4 Two` live rooms for two phones with a shared connection milestone and optional closing reward.
 - `Inner Circle` live rooms for 3-6 phones with fair targeting, scoring, Bailout, and Double Down.
 - `Icebreaker` live rooms for 3-6 phones with roulette turns and shared group progress.
-- `Caption Clash` live rooms for 3-8 phones: a rotating judge picks the caption that fits
-  the image best. Image templates are snapshotted from Imgflip by `npm run cards:refresh`;
+- `Caption Clash` live rooms for 2-8 phones, set up two ways. It runs in either direction:
+  an image on the table answered with a caption, or a caption on the table answered with an
+  image. And it runs with or without a judge - judged needs three players and scores to 5,
+  while free play needs only two, seats no judge, and simply shows both answers until the
+  cards run out. Image templates are snapshotted from Imgflip by `npm run cards:refresh`;
   Imgflip hosts them without owning them, and its terms cover the personal, non-commercial
   use this project is. The 128 caption cards are original, in English and Portuguese. This
   is the one mode that needs the network mid-game, so it does not work offline.
@@ -99,11 +102,14 @@ When creating a live room, choose the experience that suits the table:
 - `A Table 4 Two` has two partners build a shared meter toward 20 points while completing two prompts at each depth. Reaching the milestone unlocks a shared activity or meaningful closing question.
 - `Inner Circle` keeps private draws, selected responders, one free `Bailout`, and one `Double Down`, while cooldowns spread prompts fairly around the group. First to 21 wins.
 - `Icebreaker` has the active facilitator pick a light depth, then spin for a fair server-selected responder. The group builds toward 15 points together.
-- `Caption Clash` deals every player a private hand of caption cards and turns over one
-  image per round. Everyone but the judge plays at once, the played captions stay
-  anonymous while the judge decides, and authorship appears only after the round is won.
-  First to 5 points. It runs on its own engine rather than the adaptive one, because it is
-  the only mode where players act simultaneously.
+- `Caption Clash` deals every player a private hand and turns over one card per round.
+  Everyone but the judge plays at once, the plays stay anonymous while the judge decides,
+  and authorship appears only after the round is over. Which deck goes on the table and
+  which is dealt into hands is a setup choice, so the same rules run in both directions;
+  an image hand is dealt smaller than a caption hand, since every card in it is a separate
+  request to a third-party host. Without a judge there is no judging phase and no score,
+  and two players are enough. It runs on its own engine rather than the adaptive one,
+  because it is the only mode where players act simultaneously.
 
 Live rooms live only in server memory, so restarting the local or hosted server clears
 active matches.

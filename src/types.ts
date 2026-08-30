@@ -20,6 +20,8 @@ export interface SetupState {
   joinCode: string;
   joinName: string;
   joinAgreement: boolean;
+  captionPromptKind: PromptKind;
+  captionJudged: boolean;
 }
 
 export interface Prompt {
@@ -129,15 +131,25 @@ export interface CaptionPlayer {
   handCount: number;
 }
 
-/** A played caption. Its author is withheld until the round has been judged. */
+/** Which deck goes on the table; hands hold the other one. */
+export type PromptKind = "image" | "caption";
+
+/** An image card or a caption card, depending on the round direction. */
+export type PlayableCard = MemeImage | CaptionCard;
+
+export function isImageCard(card: PlayableCard | null | undefined): card is MemeImage {
+  return Boolean(card && "url" in card);
+}
+
+/** A played card. Its author is withheld while a judge is deciding. */
 export interface CaptionReveal {
   cardId: string;
-  text: string;
+  card: PlayableCard | null;
   playerId?: string;
 }
 
 export interface CaptionRoundResult {
-  imageId: string;
+  promptId: string;
   winnerId: string;
   winningCardId: string;
   judgeId: string;
@@ -145,24 +157,27 @@ export interface CaptionRoundResult {
 
 export interface CaptionSession {
   mode: "caption";
+  promptKind: PromptKind;
+  judged: boolean;
   status: "lobby" | "playing" | "finished";
-  phase: "submitting" | "judging" | "round_won" | null;
+  phase: "submitting" | "judging" | "round_over" | null;
   roundNumber: number;
   scoreTarget: number;
+  minPlayers: number;
   judgeId: string | null;
   viewerId: string;
   isJudge: boolean;
   players: CaptionPlayer[];
-  hand: CaptionCard[];
-  image: MemeImage | null;
+  hand: PlayableCard[];
+  prompt: PlayableCard | null;
   submittedPlayerIds: string[];
   awaitingPlayerIds: string[];
   reveal: CaptionReveal[];
   lastRound: CaptionRoundResult | null;
   winnerIds: string[];
   endReason: string | null;
-  captionsRemaining: number;
-  imagesRemaining: number;
+  handCardsRemaining: number;
+  promptsRemaining: number;
   availableActions: string[];
 }
 

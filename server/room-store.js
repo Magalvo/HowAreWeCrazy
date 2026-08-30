@@ -143,7 +143,9 @@ export function createRoomStore({
     hostName = "",
     mode = "conversation",
     promptFilters,
-    dateVariant
+    dateVariant,
+    promptKind,
+    judged
   }) {
     const normalizedMode = normalizeRoomMode(mode);
     if (!isKnownRoomMode(normalizedMode)) {
@@ -182,7 +184,9 @@ export function createRoomStore({
           participants: [host],
           random,
           promptFilters,
-          dateVariant
+          dateVariant,
+          promptKind,
+          judged
         }),
         createdAt: now(),
         lastActivityAt: clock(),

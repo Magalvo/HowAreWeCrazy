@@ -1887,3 +1887,84 @@ body[data-experience="caption"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Caption Clash: cards that may be text or picture --------------------------- */
+
+.prompt-stage {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.card-face {
+  display: grid;
+  gap: 6px;
+  place-items: center;
+  width: 100%;
+}
+
+.card-face.is-text {
+  display: block;
+  text-align: left;
+}
+
+.card-face.is-text.is-stage {
+  font-size: 1.15rem;
+  font-weight: 650;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.card-face.is-image {
+  min-height: 92px;
+}
+
+.card-face.is-image.is-stage {
+  min-height: 200px;
+}
+
+.card-face img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 140px;
+  border-radius: 10px;
+}
+
+.card-face.is-stage img {
+  max-height: 44vh;
+}
+
+.card-face.is-loading img {
+  display: none;
+}
+
+.card-face-note {
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.card-face-note.is-failed {
+  display: grid;
+  gap: 4px;
+}
+
+/* An image hand needs columns; a text hand reads better as a single stack. */
+.caption-hand-list.is-image-hand,
+.caption-reveal-list.is-image-hand {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 720px) {
+  .caption-hand-list.is-image-hand,
+  .caption-reveal-list.is-image-hand {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

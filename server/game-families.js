@@ -47,7 +47,8 @@ const SEATED_FAMILIES = [
   {
     name: "caption",
     handles: (mode) => mode === CAPTION_MODE,
-    create: ({ participants, random }) => createCaptionMatch({ participants, random }),
+    create: ({ participants, random, promptKind, judged }) =>
+      createCaptionMatch({ participants, random, promptKind, judged }),
     addPlayer: (session, participant) => addCaptionLobbyPlayer(session, participant),
     setPresence: (session, playerId, connected, random) =>
       setCaptionPresence(session, playerId, connected, random),

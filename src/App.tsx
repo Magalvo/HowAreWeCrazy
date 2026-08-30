@@ -245,15 +245,17 @@ export function App() {
     };
     if (setup.playMode === "host") {
       try {
-        const dateNightFilters = setup.roomMode === "date_night"
+        const experienceOptions = setup.roomMode === "date_night"
           ? {
               promptFilters: { tags: setup.selectedThemeTags, includeSpicy: setup.includeSpicy },
               dateVariant: setup.dateVariant
             }
-          : {};
+          : setup.roomMode === "caption"
+            ? { promptKind: setup.captionPromptKind, judged: setup.captionJudged }
+            : {};
         const connection = await requestJson<RoomConnection>("/api/rooms", {
           method: "POST",
-          body: JSON.stringify({ ...options, mode: setup.roomMode, hostName: setup.hostName, ...dateNightFilters })
+          body: JSON.stringify({ ...options, mode: setup.roomMode, hostName: setup.hostName, ...experienceOptions })
         });
         enterRoom(connection, "host");
         notice(setup.roomMode === "conversation"
