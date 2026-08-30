@@ -334,9 +334,9 @@ test("the reversed direction puts a caption on the table and images in hand", ()
 
 test("an image hand is dealt smaller than a caption hand", () => {
   assert.equal(captionHandSize("image"), 7);
-  assert.equal(captionHandSize("caption"), 5);
+  assert.equal(captionHandSize("caption"), 3);
   assert.equal(started(["Ana", "Rui", "Sara"]).handSize, 7);
-  assert.equal(started(["Ana", "Rui", "Sara"], { promptKind: "caption" }).handSize, 5);
+  assert.equal(started(["Ana", "Rui", "Sara"], { promptKind: "caption" }).handSize, 3);
 });
 
 test("a reversed round is judged the same way, on images", () => {

@@ -189,7 +189,7 @@ test("a caption room can be opened reversed, with images in hand", () => {
   const view = store.getRoom("PLAY5", host.participantToken).session;
   assert.equal(view.promptKind, "caption");
   assert.ok(view.prompt.text.length > 0);
-  assert.equal(view.hand.length, 5);
+  assert.equal(view.hand.length, 3);
   assert.ok(view.hand.every((card) => card.url.startsWith("https://")));
 });
 

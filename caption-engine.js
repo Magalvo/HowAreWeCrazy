@@ -15,9 +15,13 @@ export const MAX_CAPTION_PLAYERS = 8;
  */
 export const PROMPT_KINDS = ["image", "caption"];
 
-// An image hand is far heavier than a text one: every card is a separate request to a
-// third-party host, on every player's phone, every round. Fewer cards, same table.
-const HAND_SIZE_BY_KIND = { image: 7, caption: 5 };
+// Keyed by what is on the table, so each value is the size of the hand holding the other
+// deck. An image hand is far heavier than a text one: every card in it is a separate
+// request to a third-party host, on every player's phone, every round.
+const HAND_SIZE_BY_PROMPT_KIND = {
+  image: 7,   // captions in hand, cheap to render
+  caption: 3  // images in hand, one network request each
+};
 
 function fail(message, statusCode = 400) {
   const error = new Error(message);
@@ -62,7 +66,7 @@ export function minCaptionPlayers(judged) {
 }
 
 export function captionHandSize(promptKind) {
-  return HAND_SIZE_BY_KIND[promptKind] ?? HAND_SIZE_BY_KIND.image;
+  return HAND_SIZE_BY_PROMPT_KIND[promptKind] ?? HAND_SIZE_BY_PROMPT_KIND.image;
 }
 
 /** Everyone who still owes a card: connected, holding cards, and not judging. */
