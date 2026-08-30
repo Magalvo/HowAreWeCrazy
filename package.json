@@ -11,8 +11,10 @@
     "dev": "concurrently -k -n api,web \"node scripts/dev-server.mjs\" \"vite --host 0.0.0.0\"",
     "start": "node scripts/dev-server.mjs --production",
     "build": "tsc --noEmit && vite build",
-    "test": "node --test",
-    "check": "node --check game-engine.js && node --check adaptive-engine.js && node --check data/prompts.js && node --check data/classic-prompts.js && node --check data/date-rewards.js && node --check server/room-store.js && node --check server/app-server.js && node --check scripts/dev-server.mjs && tsc --noEmit && node --test"
+    "test": "npm run test:node && npm run test:web",
+    "test:node": "node --test \"test/*.test.js\"",
+    "test:web": "vitest run",
+    "check": "node --check game-engine.js && node --check adaptive-engine.js && node --check data/prompts.js && node --check data/classic-prompts.js && node --check data/date-rewards.js && node --check server/room-store.js && node --check server/app-server.js && node --check scripts/dev-server.mjs && tsc --noEmit && npm test"
   },
   "dependencies": {
     "@iconify-react/ic": "^1.0.2",
@@ -23,11 +25,16 @@
     "react-dom": "^19.2.6"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.6",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
     "concurrently": "^9.2.1",
+    "jsdom": "^30.0.1",
     "typescript": "^6.0.3",
-    "vite": "^8.0.14"
+    "vite": "^8.0.14",
+    "vitest": "^3.2.7"
   }
 }

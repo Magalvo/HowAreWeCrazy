@@ -91,6 +91,17 @@ the local or hosted server clears active matches.
 
 ```bash
 npm test
+```
+
+Two suites run under one command. `npm run test:node` covers the rule engines and the
+room API through Node's own test runner, against `test/`. `npm run test:web` covers the
+React client through Vitest and Testing Library, against tests that sit beside the code
+they exercise in `src/`.
+
+`npm run check` is the full gate: it parses every plain JavaScript module, type-checks the
+client, and runs both suites.
+
+```bash
 npm run check
 ```
 
